@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npx playwright:*)",
+      "Bash(node bot.js)",
+      "Bash(node debug-scrape.js)",
+      "WebSearch",
+      "Bash(node:*)",
+      "Bash(ssh:*)",
+      "Bash(rsync -avz -e 'ssh -o StrictHostKeyChecking=no -i \"/Users/rafael/Desktop/Documentos/poc-dev-key.pem\"' /Users/rafael/Dev/flightbot/Dockerfile ec2-user@ec2-54-91-170-193.compute-1.amazonaws.com:/home/ec2-user/flightbot/)",
+      "Bash(gh auth:*)",
+      "Bash(git rm:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+services:
+  flightbot:
+    build: .
+    container_name: flightbot
+    restart: unless-stopped
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - ./prices.json:/app/prices.json
+      - ./results.log:/app/results.log

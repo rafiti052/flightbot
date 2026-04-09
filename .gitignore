@@ -1,0 +1,5 @@
+config.json
+prices.json
+results.log
+*.png
+node_modules/
