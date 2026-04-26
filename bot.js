@@ -9,6 +9,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = path.join(__dirname, "config.json");
 const PRICES_PATH = path.join(__dirname, "prices.json");
 const LOG_PATH = path.join(__dirname, "results.log");
+const ANTHROPIC_TIMEOUT_MS = 120_000;
+const ANTHROPIC_MAX_RETRIES = 1;
+const SCRAPE_TIMEOUT_MS = 180_000;
+const MAX_SCROLL_STEPS = 20;
+const RUN_LOCK_STALE_MS = 6 * 60 * 60 * 1000;
 
 // --- Config loading ---
 
@@ -46,8 +51,20 @@ function savePrices(prices) {
 
 function log(msg) {
   const line = `[${new Date().toISOString()}] ${msg}`;
-  console.log(line);
-  fs.appendFileSync(LOG_PATH, line + "\n");
+  try {
+    console.log(line);
+  } catch {
+    // Ignore console failures so we can still attempt file logging.
+  }
+  try {
+    fs.appendFileSync(LOG_PATH, line + "\n");
+  } catch (e) {
+    try {
+      console.error(`[flightbot] Failed to append to ${LOG_PATH}: ${e.message}`);
+    } catch {
+      // Ignore secondary logging failures.
+    }
+  }
 }
 
 function logAlert(route, flight, alertType) {
@@ -60,7 +77,30 @@ function logAlert(route, flight, alertType) {
     stops: flight.stops,
     duration: flight.duration,
   };
-  fs.appendFileSync(LOG_PATH, JSON.stringify(record) + "\n");
+  try {
+    fs.appendFileSync(LOG_PATH, JSON.stringify(record) + "\n");
+  } catch (e) {
+    log(`Failed to append alert record: ${e.message}`);
+  }
+}
+
+function formatError(err) {
+  if (err instanceof Error) return err.stack || err.message;
+  return String(err);
+}
+
+async function withTimeout(promise, ms, label) {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // --- Date helpers ---
@@ -138,8 +178,12 @@ function parseDurationHours(durationStr) {
 
 // --- Scraping ---
 
-async function extractFlightsFromScreenshot(screenshot, route) {
-  const anthropic = new Anthropic({ apiKey: config.anthropic.apiKey });
+async function extractFlightsFromScreenshot(screenshot, route, apiKey) {
+  const anthropic = new Anthropic({
+    apiKey,
+    timeout: ANTHROPIC_TIMEOUT_MS,
+    maxRetries: ANTHROPIC_MAX_RETRIES,
+  });
   const currency = route.currency ?? "USD";
 
   const prompt =
@@ -179,7 +223,7 @@ async function extractFlightsFromScreenshot(screenshot, route) {
   }
 }
 
-async function scrapeFlights(route) {
+async function scrapeFlights(route, apiKey) {
   const url = buildUrl(route);
   log(`[${route.name}] Fetching: ${url}`);
 
@@ -193,6 +237,7 @@ async function scrapeFlights(route) {
   });
 
   try {
+    return await withTimeout((async () => {
     const context = await browser.newContext({
       userAgent:
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -215,26 +260,26 @@ async function scrapeFlights(route) {
     await page.waitForTimeout(3000);
 
     // Scroll down slowly to trigger lazy-loading of cheaper flights
-    await page.evaluate(async () => {
-      await new Promise((resolve) => {
-        let pos = 0;
-        const step = 600;
-        const interval = setInterval(() => {
-          window.scrollBy(0, step);
-          pos += step;
-          if (pos >= document.body.scrollHeight) {
-            clearInterval(interval);
-            resolve();
-          }
-        }, 300);
-      });
-    });
+    await page.evaluate(async (maxSteps) => {
+      const step = 600;
+      for (let i = 0; i < maxSteps; i++) {
+        const before = window.scrollY;
+        window.scrollBy(0, step);
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        const after = window.scrollY;
+        const maxScroll = Math.max(
+          document.documentElement.scrollHeight,
+          document.body?.scrollHeight ?? 0,
+        ) - window.innerHeight;
+        if (after === before || after >= maxScroll) break;
+      }
+    }, MAX_SCROLL_STEPS);
     await page.waitForTimeout(2000);
 
     const screenshot = await page.screenshot({ fullPage: true });
     log(`[${route.name}] Screenshot captured, sending to Claude...`);
 
-    const flights = await extractFlightsFromScreenshot(screenshot, route);
+    const flights = await extractFlightsFromScreenshot(screenshot, route, apiKey);
     log(`[${route.name}] Claude extracted ${flights.length} flight(s)`);
 
     // Apply filters
@@ -253,6 +298,7 @@ async function scrapeFlights(route) {
 
     filtered.sort((a, b) => a.price - b.price);
     return filtered.slice(0, 5);
+    })(), SCRAPE_TIMEOUT_MS, `[${route.name}] scrape`);
   } finally {
     await browser.close();
   }
@@ -375,7 +421,7 @@ async function run(config) {
       const label = variant._dateLabel ? ` (${variant._dateLabel})` : "";
       log(`[${route.name}]${label} Scraping...`);
       try {
-        const results = await scrapeFlights(variant);
+        const results = await scrapeFlights(variant, config.anthropic.apiKey);
         log(`[${route.name}]${label} Found ${results.length} result(s)`);
         for (const r of results) r._variant = variant;
         variantResults.push(results);
@@ -436,13 +482,48 @@ async function run(config) {
   log("=== Bot run complete ===");
 }
 
+let runState = {
+  inProgress: false,
+  startedAt: 0,
+};
+
+async function runWithLock(config, trigger) {
+  const now = Date.now();
+  if (runState.inProgress) {
+    const ageMs = now - runState.startedAt;
+    if (ageMs < RUN_LOCK_STALE_MS) {
+      log(`Skipping ${trigger} run because another run is still active (${Math.round(ageMs / 1000)}s old)`);
+      return;
+    }
+    log(`Previous run lock was stale after ${Math.round(ageMs / 1000)}s; forcing a new ${trigger} run`);
+  }
+
+  runState = { inProgress: true, startedAt: now };
+  try {
+    await run(config);
+  } catch (e) {
+    log(`${trigger === "startup" ? "Initial" : "Scheduled"} run failed: ${formatError(e)}`);
+  } finally {
+    runState = { inProgress: false, startedAt: 0 };
+  }
+}
+
 // --- Entry point ---
 
 const config = loadConfig();
 
 cron.schedule(config.schedule, () => {
-  run(config).catch((e) => log(`Run failed: ${e.message}`));
+  const freshConfig = loadConfig();
+  runWithLock(freshConfig, "schedule");
 });
 
 log(`Bot started. Schedule: ${config.schedule}`);
-run(config).catch((e) => log(`Initial run failed: ${e.message}`));
+process.on("unhandledRejection", (reason) => {
+  log(`Unhandled rejection: ${formatError(reason)}`);
+});
+
+process.on("uncaughtException", (error) => {
+  log(`Uncaught exception: ${formatError(error)}`);
+});
+
+runWithLock(config, "startup");

@@ -3,6 +3,7 @@ services:
     build: .
     container_name: flightbot
     restart: unless-stopped
+    init: true
     volumes:
       - ./config.json:/app/config.json:ro
       - ./prices.json:/app/prices.json
