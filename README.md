@@ -23,7 +23,27 @@ npm run install-browsers
 
 ## Configuration
 
-Edit `config.json` before running:
+The bot prefers **`config.yml`** at the project root (shared with the optional Next.js UI). On first startup, if only **`config.json`** exists, it is migrated once to `config.yml`.
+
+Set **`FLIGHTBOT_DATA_DIR`** to the directory that contains `config.yml`, `prices.json`, and `results.log` (defaults to the directory that contains `bot.js`).
+
+### Next.js dashboard (optional)
+
+```bash
+npm run web:dev
+```
+
+Opens the read-only dashboard on port **3001** (see `apps/web`). It reads the same data directory and polls `.flightbot/last-run.json` after each bot run. For config saves proxied through the web app, set **`FLIGHTBOT_BOT_URL`** to the bot admin URL (e.g. `http://localhost:3000`).
+
+### Docker
+
+`docker compose up` starts **flightbot** (port 3000) and **flightbot-web** (port 3001) with `./` mounted as the shared data directory.
+
+---
+
+## Legacy JSON shape (still valid after migration)
+
+Edit `config.json` before first run if you have not migrated yet; after migration, edit `config.yml` instead.
 
 ```json
 {

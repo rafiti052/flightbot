@@ -5,11 +5,26 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import {
+  migrateJsonToYamlIfNeeded,
+  readFlightbotConfig,
+  writeFlightbotConfigAtomic,
+  stripInternalConfigFields,
+  writeLastRunMarker,
+  ConfigRevisionConflict,
+} from "@flightbot/shared";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const CONFIG_PATH = path.join(__dirname, "config.json");
-const PRICES_PATH = path.join(__dirname, "prices.json");
-const LOG_PATH = path.join(__dirname, "results.log");
+const DATA_DIR = process.env.FLIGHTBOT_DATA_DIR || __dirname;
+const PRICES_PATH = path.join(DATA_DIR, "prices.json");
+const LOG_PATH = path.join(DATA_DIR, "results.log");
+
+(() => {
+  const m = migrateJsonToYamlIfNeeded(DATA_DIR);
+  if (m.migrated && m.message) {
+    console.log(`[flightbot] ${m.message}`);
+  }
+})();
 const ANTHROPIC_TIMEOUT_MS = 120_000;
 const ANTHROPIC_MAX_RETRIES = 1;
 const SCRAPE_TIMEOUT_MS = 180_000;
@@ -19,20 +34,8 @@ const RUN_LOCK_STALE_MS = 6 * 60 * 60 * 1000;
 // --- Config loading ---
 
 function loadConfig() {
-  if (!fs.existsSync(CONFIG_PATH)) {
-    throw new Error(`config.json not found at ${CONFIG_PATH}. Please create it before running the bot.`);
-  }
-  let raw;
-  try {
-    raw = fs.readFileSync(CONFIG_PATH, "utf-8");
-  } catch (e) {
-    throw new Error(`Failed to read config.json: ${e.message}`);
-  }
-  try {
-    return JSON.parse(raw);
-  } catch (e) {
-    throw new Error(`config.json is malformed JSON: ${e.message}`);
-  }
+  const { config } = readFlightbotConfig(DATA_DIR);
+  return config;
 }
 
 function loadPrices() {
@@ -769,12 +772,24 @@ async function runWithLock(config, trigger) {
   }
 
   runState = { inProgress: true, startedAt: now };
+  let runFailed = false;
+  let runErrorText = null;
   try {
     await run(config);
   } catch (e) {
-    log(`${trigger === "startup" ? "Initial" : "Scheduled"} run failed: ${formatError(e)}`);
+    runFailed = true;
+    runErrorText = formatError(e);
+    log(`${trigger === "startup" ? "Initial" : "Scheduled"} run failed: ${runErrorText}`);
   } finally {
     runState = { inProgress: false, startedAt: 0 };
+    try {
+      writeLastRunMarker(DATA_DIR, {
+        status: runFailed ? "error" : "ok",
+        error: runFailed ? runErrorText : null,
+      });
+    } catch (e2) {
+      log(`Failed to write last-run marker: ${e2.message}`);
+    }
   }
 }
 
@@ -800,10 +815,8 @@ function deepMergePreservingSensitive(incoming, onDisk) {
   };
 }
 
-function writeConfigAtomic(config) {
-  const tmp = CONFIG_PATH + ".tmp";
-  fs.writeFileSync(tmp, JSON.stringify(config, null, 2));
-  fs.renameSync(tmp, CONFIG_PATH);
+function writeConfigAtomic(config, options = {}) {
+  writeFlightbotConfigAtomic(DATA_DIR, config, options);
 }
 
 // --- UI HTML ---
@@ -2226,6 +2239,7 @@ const UI_HTML = `<!DOCTYPE html>
 let state = {
   config: null,
   originalConfig: null,
+  configRevision: null,
   status: null,
   editingIndex: null,
   statusTimer: null,
@@ -2241,10 +2255,14 @@ async function fetchJson(url) {
 }
 
 async function loadConfigState() {
-  const config = await fetchJson('/config');
+  const data = await fetchJson('/config');
+  const revision = typeof data.revision === "number" ? data.revision : 0;
+  const { revision: _r, ...config } = data;
+  void _r;
   if (!Array.isArray(config.routes)) config.routes = [];
   state.config = config;
   state.originalConfig = JSON.parse(JSON.stringify(config));
+  state.configRevision = revision;
 }
 
 async function loadStatusState(silent) {
@@ -3197,18 +3215,30 @@ function saveRoute() {
 async function saveConfig() {
   document.getElementById('save-btn').disabled = true;
   try {
+    const payload = Object.assign({}, state.config, {
+      expectedRevision: state.configRevision,
+    });
     const res = await fetch('/config', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(state.config),
+      body: JSON.stringify(payload),
     });
     const data = await res.json().catch(function () { return {}; });
     if (!res.ok) {
-      showToast(data.error || 'Save failed', true);
+      if (res.status === 409) {
+        showToast((data.error || 'Config was changed elsewhere. Reloading…'), true);
+        await loadConfigState();
+        render();
+      } else {
+        showToast(data.error || 'Save failed', true);
+      }
       document.getElementById('save-btn').disabled = false;
       return;
     }
 
+    if (typeof data.revision === 'number') {
+      state.configRevision = data.revision;
+    }
     state.originalConfig = JSON.parse(JSON.stringify(state.config));
     const scheduleBadge = document.getElementById('schedule-badge');
     if (scheduleBadge) {
@@ -3262,8 +3292,9 @@ app.get("/", (req, res) => {
 
 app.get("/config", (req, res) => {
   try {
-    const config = loadConfig();
-    res.json(maskConfig(config));
+    const { config, revision } = readFlightbotConfig(DATA_DIR);
+    const publicShape = stripInternalConfigFields(config);
+    res.json({ ...maskConfig(publicShape), revision });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -3279,15 +3310,22 @@ app.get("/status", (req, res) => {
 
 app.put("/config", (req, res) => {
   const incoming = req.body;
+  const { expectedRevision: clientRevision, ...patch } = incoming;
+  const expectedRevisionOpt =
+    clientRevision !== undefined &&
+    clientRevision !== null &&
+    Number.isFinite(Number(clientRevision))
+      ? Number(clientRevision)
+      : undefined;
 
   // Validate schedule
-  if (incoming.schedule !== undefined && !cron.validate(incoming.schedule)) {
+  if (patch.schedule !== undefined && !cron.validate(patch.schedule)) {
     return res.status(400).json({ error: `Invalid cron expression: "${incoming.schedule}"` });
   }
 
   // Validate routes
-  if (incoming.routes) {
-    for (const r of incoming.routes) {
+  if (patch.routes) {
+    for (const r of patch.routes) {
       if (!r.name || !r.from || !r.to || !r.departureDate) {
         return res.status(400).json({ error: "Route missing required field (name, from, to, departureDate)" });
       }
@@ -3304,11 +3342,15 @@ app.put("/config", (req, res) => {
 
   try {
     const onDisk = loadConfig();
-    const merged = deepMergePreservingSensitive(incoming, onDisk);
-    writeConfigAtomic(merged);
-    const scheduleChanged = incoming.schedule !== undefined && incoming.schedule !== onDisk.schedule;
-    res.json({ ok: true, scheduled: scheduleChanged ? "restart-required" : "live" });
+    const merged = deepMergePreservingSensitive(patch, onDisk);
+    writeConfigAtomic(merged, { expectedRevision: expectedRevisionOpt });
+    const scheduleChanged = patch.schedule !== undefined && patch.schedule !== onDisk.schedule;
+    const { revision } = readFlightbotConfig(DATA_DIR);
+    res.json({ ok: true, scheduled: scheduleChanged ? "restart-required" : "live", revision });
   } catch (e) {
+    if (e instanceof ConfigRevisionConflict) {
+      return res.status(409).json({ error: e.message, revision: e.actualRevision });
+    }
     res.status(500).json({ error: e.message });
   }
 });
