@@ -4,5 +4,6 @@ prices.json
 results.log
 *.png
 node_modules/
+apps/web/.next/
 .claude/settings.local.json
 .projectpal/
