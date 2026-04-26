@@ -1,6 +1,6 @@
 # Flight Price Monitor Bot
 
-Node.js bot that scrapes Google Flights via Playwright, uses Claude vision (Haiku) to extract flight data from screenshots, and sends Telegram alerts when prices hit or drop below budget.
+Node.js bot that scrapes Google Flights via Playwright, uses Codex vision (Haiku) to extract flight data from screenshots, and sends Telegram alerts when prices hit or drop below budget.
 
 ## Architecture
 
@@ -15,7 +15,7 @@ Node.js bot that scrapes Google Flights via Playwright, uses Claude vision (Haik
 2. `run(config)` executes immediately and then on cron schedule
 3. For each active route, `dateVariants()` expands `flexDays` into multiple departure offsets
 4. `scrapeFlights()` launches headless Chromium, navigates Google Flights, takes a full-page screenshot
-5. `extractFlightsFromScreenshot()` sends the screenshot to `claude-haiku-4-5-20251001` via the Anthropic SDK and parses the JSON response
+5. `extractFlightsFromScreenshot()` sends the screenshot to `Codex-haiku-4-5-20251001` via the Anthropic SDK and parses the JSON response
 6. `evaluateAlert()` compares best price against `maxBudget` and previous alert state
 7. `sendTelegram()` fires a Markdown message via the Bot API
 
@@ -33,7 +33,7 @@ Node.js bot that scrapes Google Flights via Playwright, uses Claude vision (Haik
 
 | Field                       | Notes                                                                 |
 | --------------------------- | --------------------------------------------------------------------- |
-| `anthropic.apiKey`          | Anthropic API key for Claude vision                                   |
+| `anthropic.apiKey`          | Anthropic API key for Codex vision                                    |
 | `telegram.token` / `chatId` | Telegram Bot API credentials                                          |
 | `schedule`                  | Standard cron syntax                                                  |
 | `routes[].flexDays`         | Expands departure date ±N days; each variant is scraped separately    |
@@ -58,13 +58,13 @@ docker-compose up -d
 ## Dependencies
 
 - `playwright` — headless Chromium scraping
-- `@anthropic-ai/sdk` — Claude vision for flight extraction
+- `@anthropic-ai/sdk` — Codex vision for flight extraction
 - `node-cron` — schedule
 
 ## Notes
 
 - Rate limiting: 3–6s random delay between date variants; 5s between routes
-- Filters (`maxStops`, `maxDurationHours`) are applied after Claude extraction, not at scrape time
+- Filters (`maxStops`, `maxDurationHours`) are applied after Codex extraction, not at scrape time
 - `prices.json` uses route `name` as key — changing a route name resets its alert history
-- The bot uses `claude-haiku-4-5-20251001` for cost efficiency on vision tasks
+- The bot uses `Codex-haiku-4-5-20251001` for cost efficiency on vision tasks
 

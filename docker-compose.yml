@@ -4,7 +4,9 @@ services:
     container_name: flightbot
     restart: unless-stopped
     init: true
+    ports:
+      - "${PORT:-3000}:3000"
     volumes:
-      - ./config.json:/app/config.json:ro
+      - ./config.json:/app/config.json
       - ./prices.json:/app/prices.json
       - ./results.log:/app/results.log
