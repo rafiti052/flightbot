@@ -7,3 +7,8 @@ node_modules/
 apps/web/.next/
 .claude/settings.local.json
 .projectpal/
+.flightbot/
+
+# Local-only bootstrap docs (templates + script stay tracked)
+bootstrap/aws/README.md
+bootstrap/web-google-auth.md

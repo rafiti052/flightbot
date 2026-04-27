@@ -760,6 +760,37 @@ let runState = {
   startedAt: 0,
 };
 
+/** @type {ReturnType<typeof cron.schedule> | null} */
+let cronJob = null;
+
+/**
+ * Re-register the cron job so schedule changes take effect without restarting the process.
+ * @param {string | undefined} expression
+ * @param {string} [label]
+ * @returns {boolean}
+ */
+function applyCronSchedule(expression, label = "schedule") {
+  const expr = expression == null ? "" : String(expression);
+  if (!cron.validate(expr)) {
+    log(`Refusing invalid cron expression (${label}): ${expr}`);
+    return false;
+  }
+  if (cronJob) {
+    try {
+      cronJob.stop();
+    } catch (e) {
+      log(`Failed to stop previous cron job: ${e.message}`);
+    }
+    cronJob = null;
+  }
+  cronJob = cron.schedule(expr, () => {
+    const freshConfig = loadConfig();
+    runWithLock(freshConfig, "schedule");
+  });
+  log(`Cron registered (${label}): ${expr}`);
+  return true;
+}
+
 async function runWithLock(config, trigger) {
   const now = Date.now();
   if (runState.inProgress) {
@@ -2254,9 +2285,16 @@ async function fetchJson(url) {
   return data;
 }
 
+function parseRevisionFromPayload(data) {
+  const r = data && data.revision;
+  if (typeof r === "number" && Number.isFinite(r)) return r;
+  const n = Number(r);
+  return Number.isFinite(n) ? n : 0;
+}
+
 async function loadConfigState() {
   const data = await fetchJson('/config');
-  const revision = typeof data.revision === "number" ? data.revision : 0;
+  const revision = parseRevisionFromPayload(data);
   const { revision: _r, ...config } = data;
   void _r;
   if (!Array.isArray(config.routes)) config.routes = [];
@@ -3215,9 +3253,10 @@ function saveRoute() {
 async function saveConfig() {
   document.getElementById('save-btn').disabled = true;
   try {
-    const payload = Object.assign({}, state.config, {
-      expectedRevision: state.configRevision,
-    });
+    const payload = Object.assign({}, state.config);
+    if (Number.isFinite(state.configRevision)) {
+      payload.expectedRevision = state.configRevision;
+    }
     const res = await fetch('/config', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -3236,14 +3275,11 @@ async function saveConfig() {
       return;
     }
 
-    if (typeof data.revision === 'number') {
-      state.configRevision = data.revision;
-    }
-    state.originalConfig = JSON.parse(JSON.stringify(state.config));
     const scheduleBadge = document.getElementById('schedule-badge');
     if (scheduleBadge) {
       scheduleBadge.style.display = 'none';
     }
+    await loadConfigState();
     clearDirty();
     await loadStatusState(true);
     render();
@@ -3320,7 +3356,7 @@ app.put("/config", (req, res) => {
 
   // Validate schedule
   if (patch.schedule !== undefined && !cron.validate(patch.schedule)) {
-    return res.status(400).json({ error: `Invalid cron expression: "${incoming.schedule}"` });
+    return res.status(400).json({ error: `Invalid cron expression: "${patch.schedule}"` });
   }
 
   // Validate routes
@@ -3344,9 +3380,13 @@ app.put("/config", (req, res) => {
     const onDisk = loadConfig();
     const merged = deepMergePreservingSensitive(patch, onDisk);
     writeConfigAtomic(merged, { expectedRevision: expectedRevisionOpt });
-    const scheduleChanged = patch.schedule !== undefined && patch.schedule !== onDisk.schedule;
+    let scheduled = "live";
+    if (patch.schedule !== undefined && patch.schedule !== onDisk.schedule) {
+      const ok = applyCronSchedule(merged.schedule, "from HTTP config save");
+      scheduled = ok ? "live" : "restart-required";
+    }
     const { revision } = readFlightbotConfig(DATA_DIR);
-    res.json({ ok: true, scheduled: scheduleChanged ? "restart-required" : "live", revision });
+    res.json({ ok: true, scheduled, revision });
   } catch (e) {
     if (e instanceof ConfigRevisionConflict) {
       return res.status(409).json({ error: e.message, revision: e.actualRevision });
@@ -3363,10 +3403,7 @@ app.listen(PORT, () => {
 
 const config = loadConfig();
 
-cron.schedule(config.schedule, () => {
-  const freshConfig = loadConfig();
-  runWithLock(freshConfig, "schedule");
-});
+applyCronSchedule(config.schedule, "startup");
 
 log(`Bot started. Schedule: ${config.schedule}`);
 process.on("unhandledRejection", (reason) => {

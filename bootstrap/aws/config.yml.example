@@ -1,0 +1,30 @@
+# Copy to config.yml in your data directory and replace placeholders.
+# Never commit the filled config.yml (keep it only on the server / volume).
+
+schemaVersion: 1
+schedule: "0 7,13,20 * * *"
+
+anthropic:
+  apiKey: "REPLACE_WITH_ANTHROPIC_API_KEY"
+
+telegram:
+  token: "REPLACE_WITH_TELEGRAM_BOT_TOKEN"
+  chatId: "REPLACE_WITH_TELEGRAM_CHAT_ID"
+
+routes:
+  - name: Example GRU → LIS
+    from: GRU
+    to: LIS
+    roundTrip: true
+    departureDate: "2026-09-01"
+    returnDate: "2026-09-10"
+    flexDays: 0
+    currency: BRL
+    maxStops: null
+    maxBudget: null
+    maxDurationHours: null
+    active: true
+
+_configMeta:
+  revision: 0
+  updatedAt: "2026-01-01T00:00:00.000Z"
