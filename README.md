@@ -37,10 +37,10 @@ Set **`FLIGHTBOT_DATA_DIR`** to the directory that contains `config.yml`, `price
 ### Next.js dashboard (primary UI)
 
 ```bash
-npm run web:dev
+npm run dashboard:dev
 ```
 
-Opens the dashboard on port **3001** (see `apps/web`). It reads the same data directory and polls `.flightbot/last-run.json` after each bot run. For config saves proxied through the web app, set **`FLIGHTBOT_BOT_URL`** to the bot admin URL (e.g. `http://localhost:3000`).
+Opens the dashboard on port **3001** (implemented in `apps/web`). It reads the same data directory and polls `.flightbot/last-run.json` after each bot run. For config saves proxied through the dashboard, set **`FLIGHTBOT_BOT_URL`** to the bot admin URL (e.g. `http://localhost:3000`).
 
 #### UI + bot architecture
 
@@ -57,6 +57,14 @@ Opens the dashboard on port **3001** (see `apps/web`). It reads the same data di
 #### Vercel environment notes
 
 For the first production rollout, it is fine to configure environment variables only for the **Production** environment in Vercel. Preview environments are optional and can be added later per branch if needed.
+
+The Vercel project name is `flightbot`, and the deployed dashboard source lives under `apps/web`.
+
+- Keep the Vercel project **Root Directory** set to `apps/web` in project settings.
+- This repo also includes a root `vercel.json` with workspace-aware build command for consistency.
+- Manual deploy shortcuts from repo root:
+  - `npm run vercel:preview`
+  - `npm run vercel:prod`
 
 ### Docker
 
@@ -116,9 +124,9 @@ The bot runs once immediately on startup, then follows the cron schedule.
 
 ---
 
-## CI test gates (web)
+## CI test gates (dashboard)
 
-GitHub Actions runs the web app test suite with unit tests gating e2e execution:
+GitHub Actions runs the dashboard test suite with unit tests gating e2e execution:
 
 ```bash
 npm run test:unit -w @flightbot/web
