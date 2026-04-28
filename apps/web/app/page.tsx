@@ -11,20 +11,32 @@ export const dynamic = "force-dynamic";
 
 function botBaseUrl() {
   const base = process.env.FLIGHTBOT_BOT_URL?.replace(/\/$/, "");
-  if (!base) throw new Error("FLIGHTBOT_BOT_URL is not set");
-  return base;
+  return base || null;
 }
 
 function botToken() {
   const token = process.env.FLIGHTBOT_ADMIN_TOKEN;
-  if (!token) throw new Error("FLIGHTBOT_ADMIN_TOKEN is not set");
-  return token;
+  return token || null;
 }
 
 async function fetchBotJson(pathname: string) {
+  const base = botBaseUrl();
+  const token = botToken();
+  if (!base || !token) {
+    throw new Error(
+      [
+        "Bot backend is not configured.",
+        base ? null : "Missing FLIGHTBOT_BOT_URL.",
+        token ? null : "Missing FLIGHTBOT_ADMIN_TOKEN.",
+      ]
+        .filter(Boolean)
+        .join(" ")
+    );
+  }
+
   const res = await fetch(`${botBaseUrl()}${pathname}`, {
     cache: "no-store",
-    headers: { Authorization: `Bearer ${botToken()}` },
+    headers: { Authorization: `Bearer ${token}` },
   });
   const text = await res.text();
   if (!res.ok) {
@@ -35,20 +47,42 @@ async function fetchBotJson(pathname: string) {
 
 export default async function HomePage() {
   await getSessionOrRedirect();
-  const [cfg, status] = await Promise.all([fetchBotJson("/config"), fetchBotJson("/status")]);
-  const publicCfg = cfg as Record<string, unknown>;
+  let publicCfg: Record<string, unknown> = {};
+  let status: Record<string, unknown> = {};
+  let botError: string | null = null;
+
+  try {
+    const [cfg, st] = await Promise.all([fetchBotJson("/config"), fetchBotJson("/status")]);
+    publicCfg = cfg as Record<string, unknown>;
+    status = st as Record<string, unknown>;
+  } catch (e) {
+    botError = e instanceof Error ? e.message : String(e);
+  }
+
   const routes = publicCfg.routes as unknown;
   const routeCount = Array.isArray(routes) ? routes.length : 0;
-  const masked = {
-    ...publicCfg,
-    anthropic: { ...(publicCfg.anthropic as object), apiKey: "••••••" },
-    telegram: { ...(publicCfg.telegram as object), token: "••••••" },
-  };
+  const masked =
+    publicCfg && typeof publicCfg === "object"
+      ? {
+          ...publicCfg,
+          anthropic: { ...(publicCfg.anthropic as object), apiKey: "••••••" },
+          telegram: { ...(publicCfg.telegram as object), token: "••••••" },
+        }
+      : publicCfg;
 
   return (
     <main className="container">
       <RunPoller />
-      <PageHeader botBase={botBaseUrl()} revision={String(publicCfg.revision ?? "n/a")} routeCount={routeCount} />
+      {botError ? (
+        <p className="notice noticeErr" style={{ marginTop: 10 }}>
+          {botError}
+        </p>
+      ) : null}
+      <PageHeader
+        botBase={botBaseUrl() ?? ""}
+        revision={String(publicCfg.revision ?? "n/a")}
+        routeCount={routeCount}
+      />
       <ScheduleSection
         schedule={String(publicCfg.schedule ?? "")}
         initialConfig={publicCfg}
