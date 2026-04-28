@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "next dev -p 3001 -H 0.0.0.0",
     "build": "next build",
-    "start": "next start -p 3001"
+    "start": "next start -p 3001",
+    "test:unit": "npx --yes tsx --test \"./**/__tests__/*.test.ts\"",
+    "e2e": "playwright test",
+    "e2e:headed": "playwright test --headed"
   },
   "dependencies": {
     "next": "^14.2.18",

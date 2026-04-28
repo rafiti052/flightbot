@@ -34,13 +34,25 @@ Set **`FLIGHTBOT_DATA_DIR`** to the directory that contains `config.yml`, `price
 - `FLIGHTBOT_LOG_MAX_BYTES` (default: `20971520`, i.e. 20 MB)
 - `FLIGHTBOT_LOG_RETAIN_FILES` (default: `7`)
 
-### Next.js dashboard (optional)
+### Next.js dashboard (primary UI)
 
 ```bash
 npm run web:dev
 ```
 
-Opens the read-only dashboard on port **3001** (see `apps/web`). It reads the same data directory and polls `.flightbot/last-run.json` after each bot run. For config saves proxied through the web app, set **`FLIGHTBOT_BOT_URL`** to the bot admin URL (e.g. `http://localhost:3000`).
+Opens the dashboard on port **3001** (see `apps/web`). It reads the same data directory and polls `.flightbot/last-run.json` after each bot run. For config saves proxied through the web app, set **`FLIGHTBOT_BOT_URL`** to the bot admin URL (e.g. `http://localhost:3000`).
+
+#### UI + bot architecture
+
+- `bot.js` is the runtime composition entrypoint (startup wiring, scheduling, Express route registration).
+- `packages/runtime/core.js` contains shared runtime domain helpers (dates, URL/message formatting, alert evaluation, status read-model shaping).
+- `packages/runtime/worker.js` contains worker-owned foundations (price store + results log adapter).
+- `packages/runtime/orchestration.js` contains worker run orchestration (startup run lock, stale lock handling, cron registration/re-registration).
+- `packages/runtime/api.js` contains API-owned foundations (admin auth, config merge policy, config write rate limiting).
+- `apps/web` is the authenticated configuration dashboard (structured schedule UI + advanced JSON editor).
+- Legacy embedded HTML UI has been removed from the bot runtime to keep API responsibilities focused.
+- `results.log` is owned by the worker logging pipeline (rotation/retention controlled via `FLIGHTBOT_LOG_MAX_BYTES` and `FLIGHTBOT_LOG_RETAIN_FILES`).
+- Optional helper: set `FLIGHTBOT_WEB_URL` so bot root (`/`) can point to your deployed dashboard URL.
 
 #### Vercel environment notes
 
@@ -101,6 +113,17 @@ node bot.js
 ```
 
 The bot runs once immediately on startup, then follows the cron schedule.
+
+---
+
+## CI test gates (web)
+
+GitHub Actions runs the web app test suite with unit tests gating e2e execution:
+
+```bash
+npm run test:unit -w @flightbot/web
+npm run e2e -w @flightbot/web
+```
 
 ---
 

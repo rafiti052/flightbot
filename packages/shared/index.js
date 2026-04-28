@@ -220,3 +220,5 @@ export function readLastRunMarker(dataDir) {
     return null;
   }
 }
+
+export { createResultsLogger } from "./resultsLog.js";

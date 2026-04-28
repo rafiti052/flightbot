@@ -1,6 +1,11 @@
 import { getSessionOrRedirect } from "@/lib/requireSession";
+import { ConfigMaskedSection } from "./components/ConfigMaskedSection";
 import { ConfigEditor } from "./components/ConfigEditor";
+import { PageHeader } from "./components/PageHeader";
+import { RoutesSection } from "./components/RoutesSection";
 import { RunPoller } from "./components/RunPoller";
+import { ScheduleSection } from "./components/ScheduleSection";
+import { StatusSection } from "./components/StatusSection";
 
 export const dynamic = "force-dynamic";
 
@@ -43,24 +48,21 @@ export default async function HomePage() {
   return (
     <main className="container">
       <RunPoller />
-      <h1>Flightbot dashboard</h1>
-      <p className="muted">
-        Bot base: <code>{botBaseUrl()}</code> — config revision <strong>{String(publicCfg.revision ?? "n/a")}</strong>,{" "}
-        <strong>{routeCount}</strong> route(s).
-      </p>
-      <section className="card">
-        <h2>Schedule</h2>
-        <pre>{String(publicCfg.schedule ?? "")}</pre>
-      </section>
-      <section className="card">
-        <h2>Config (masked)</h2>
-        <pre>{JSON.stringify(masked, null, 2)}</pre>
-      </section>
+      <PageHeader botBase={botBaseUrl()} revision={String(publicCfg.revision ?? "n/a")} routeCount={routeCount} />
+      <ScheduleSection
+        schedule={String(publicCfg.schedule ?? "")}
+        initialConfig={publicCfg}
+        initialRevision={Number(publicCfg.revision ?? 0)}
+      />
+      <RoutesSection
+        routes={routes}
+        routeCount={routeCount}
+        initialConfig={publicCfg}
+        initialRevision={Number(publicCfg.revision ?? 0)}
+      />
+      <ConfigMaskedSection maskedConfig={masked} />
       <ConfigEditor initialConfig={publicCfg} initialRevision={Number(publicCfg.revision ?? 0)} />
-      <section className="card">
-        <h2>Status</h2>
-        <pre>{JSON.stringify(status, null, 2)}</pre>
-      </section>
+      <StatusSection status={status} />
     </main>
   );
 }
