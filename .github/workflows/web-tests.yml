@@ -29,7 +29,8 @@ jobs:
         run: npm ci
 
       - name: Run web unit tests
-        run: npm run test:unit -w @flightbot/web
+        working-directory: apps/web
+        run: npm run test:unit
 
   e2e:
     name: End-to-end tests
