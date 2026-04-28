@@ -8,5 +8,7 @@ RUN npm ci --omit=dev
 
 COPY bot.js ./
 COPY packages/shared/index.js ./packages/shared/
+COPY packages/shared/resultsLog.js ./packages/shared/
+COPY packages/runtime/ ./packages/runtime/
 
 CMD ["node", "bot.js"]
