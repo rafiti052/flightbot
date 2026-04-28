@@ -1,76 +1,66 @@
-import fs from "node:fs";
-import path from "node:path";
-import {
-  migrateJsonToYamlIfNeeded,
-  readFlightbotConfig,
-  readLastRunMarker,
-  stripInternalConfigFields,
-} from "@flightbot/shared";
+import { getSessionOrRedirect } from "@/lib/requireSession";
+import { ConfigEditor } from "./components/ConfigEditor";
 import { RunPoller } from "./components/RunPoller";
 
 export const dynamic = "force-dynamic";
 
-function dataDir() {
-  const d = process.env.FLIGHTBOT_DATA_DIR;
-  if (!d) throw new Error("FLIGHTBOT_DATA_DIR is not set");
-  return d;
+function botBaseUrl() {
+  const base = process.env.FLIGHTBOT_BOT_URL?.replace(/\/$/, "");
+  if (!base) throw new Error("FLIGHTBOT_BOT_URL is not set");
+  return base;
 }
 
-function tailLog(dir: string, maxBytes = 24_000, maxLines = 12) {
-  const logPath = path.join(dir, "results.log");
-  if (!fs.existsSync(logPath)) return "(no results.log)";
-  const stat = fs.statSync(logPath);
-  const start = Math.max(0, stat.size - maxBytes);
-  const fd = fs.openSync(logPath, "r");
-  try {
-    const buf = Buffer.alloc(Math.min(maxBytes, stat.size));
-    fs.readSync(fd, buf, 0, buf.length, start);
-    const raw = buf.toString("utf-8");
-    const lines = raw.split(/\r?\n/).filter(Boolean);
-    return lines.slice(-maxLines).join("\n") || "(empty)";
-  } finally {
-    fs.closeSync(fd);
+function botToken() {
+  const token = process.env.FLIGHTBOT_ADMIN_TOKEN;
+  if (!token) throw new Error("FLIGHTBOT_ADMIN_TOKEN is not set");
+  return token;
+}
+
+async function fetchBotJson(pathname: string) {
+  const res = await fetch(`${botBaseUrl()}${pathname}`, {
+    cache: "no-store",
+    headers: { Authorization: `Bearer ${botToken()}` },
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`Bot API ${pathname} failed (${res.status}): ${text.slice(0, 300)}`);
   }
+  return text ? JSON.parse(text) : {};
 }
 
-export default function HomePage() {
-  const dir = dataDir();
-  migrateJsonToYamlIfNeeded(dir);
-  const { config, revision } = readFlightbotConfig(dir);
-  const publicCfg = stripInternalConfigFields(config) as Record<string, unknown>;
-  const routes = publicCfg.routes;
+export default async function HomePage() {
+  await getSessionOrRedirect();
+  const [cfg, status] = await Promise.all([fetchBotJson("/config"), fetchBotJson("/status")]);
+  const publicCfg = cfg as Record<string, unknown>;
+  const routes = publicCfg.routes as unknown;
   const routeCount = Array.isArray(routes) ? routes.length : 0;
   const masked = {
     ...publicCfg,
     anthropic: { ...(publicCfg.anthropic as object), apiKey: "••••••" },
     telegram: { ...(publicCfg.telegram as object), token: "••••••" },
   };
-  const lastRun = readLastRunMarker(dir);
 
   return (
-    <>
+    <main className="container">
       <RunPoller />
-      <h1>Flightbot (Next.js)</h1>
-      <p>
-        Data dir: <code>{dir}</code> — config revision <strong>{revision}</strong>,{" "}
+      <h1>Flightbot dashboard</h1>
+      <p className="muted">
+        Bot base: <code>{botBaseUrl()}</code> — config revision <strong>{String(publicCfg.revision ?? "n/a")}</strong>,{" "}
         <strong>{routeCount}</strong> route(s).
       </p>
-      <section>
+      <section className="card">
         <h2>Schedule</h2>
-        <pre>{String((config as Record<string, unknown>).schedule ?? "")}</pre>
+        <pre>{String(publicCfg.schedule ?? "")}</pre>
       </section>
-      <section>
+      <section className="card">
         <h2>Config (masked)</h2>
         <pre>{JSON.stringify(masked, null, 2)}</pre>
       </section>
-      <section>
-        <h2>Last bot run</h2>
-        <pre>{JSON.stringify(lastRun, null, 2) ?? "null"}</pre>
+      <ConfigEditor initialConfig={publicCfg} initialRevision={Number(publicCfg.revision ?? 0)} />
+      <section className="card">
+        <h2>Status</h2>
+        <pre>{JSON.stringify(status, null, 2)}</pre>
       </section>
-      <section>
-        <h2>Log tail</h2>
-        <pre>{tailLog(dir)}</pre>
-      </section>
-    </>
+    </main>
   );
 }

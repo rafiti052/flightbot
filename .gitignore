@@ -9,6 +9,7 @@ apps/web/.next/
 .projectpal/
 .flightbot/
 
-# Local-only bootstrap docs (templates + script stay tracked)
-bootstrap/aws/README.md
-bootstrap/web-google-auth.md
+# Local-only docs (kept on disk, never versioned)
+docs/
+.vercel
+.env*.local

@@ -8,10 +8,11 @@
     "start": "next start -p 3001"
   },
   "dependencies": {
-    "@flightbot/shared": "file:../../packages/shared",
     "next": "^14.2.18",
+    "next-auth": "^4.24.7",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "yaml": "^2.8.1"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

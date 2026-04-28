@@ -7,8 +7,6 @@ if (!process.env.FLIGHTBOT_DATA_DIR) {
 }
 
 /** @type {import('next').NextConfig} */
-const nextConfig = {
-  transpilePackages: ["@flightbot/shared"],
-};
+const nextConfig = {};
 
 export default nextConfig;

@@ -27,6 +27,13 @@ The bot prefers **`config.yml`** at the project root (shared with the optional N
 
 Set **`FLIGHTBOT_DATA_DIR`** to the directory that contains `config.yml`, `prices.json`, and `results.log` (defaults to the directory that contains `bot.js`).
 
+### Log rotation and retention
+
+`results.log` is rotated automatically before each append when it grows beyond the max size. The old file is renamed to `results-YYYYMMDD-HHmmss.log`, and only the newest rotated archives are kept.
+
+- `FLIGHTBOT_LOG_MAX_BYTES` (default: `20971520`, i.e. 20 MB)
+- `FLIGHTBOT_LOG_RETAIN_FILES` (default: `7`)
+
 ### Next.js dashboard (optional)
 
 ```bash
@@ -34,6 +41,10 @@ npm run web:dev
 ```
 
 Opens the read-only dashboard on port **3001** (see `apps/web`). It reads the same data directory and polls `.flightbot/last-run.json` after each bot run. For config saves proxied through the web app, set **`FLIGHTBOT_BOT_URL`** to the bot admin URL (e.g. `http://localhost:3000`).
+
+#### Vercel environment notes
+
+For the first production rollout, it is fine to configure environment variables only for the **Production** environment in Vercel. Preview environments are optional and can be added later per branch if needed.
 
 ### Docker
 

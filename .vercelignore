@@ -1,0 +1,11 @@
+.git
+node_modules
+apps/web/.next
+results.log
+prices.json
+config.json
+config.yml
+.flightbot
+.projectpal
+bootstrap
+test-*.png

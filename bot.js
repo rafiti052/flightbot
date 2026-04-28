@@ -5,6 +5,7 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import crypto from "node:crypto";
 import {
   migrateJsonToYamlIfNeeded,
   readFlightbotConfig,
@@ -18,6 +19,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.env.FLIGHTBOT_DATA_DIR || __dirname;
 const PRICES_PATH = path.join(DATA_DIR, "prices.json");
 const LOG_PATH = path.join(DATA_DIR, "results.log");
+const LOG_MAX_BYTES = parseIntEnv("FLIGHTBOT_LOG_MAX_BYTES", 20 * 1024 * 1024);
+const LOG_RETAIN_FILES = parseIntEnv("FLIGHTBOT_LOG_RETAIN_FILES", 7);
 
 (() => {
   const m = migrateJsonToYamlIfNeeded(DATA_DIR);
@@ -51,6 +54,14 @@ function savePrices(prices) {
   fs.writeFileSync(PRICES_PATH, JSON.stringify(prices, null, 2));
 }
 
+function parseIntEnv(name, fallback) {
+  const raw = process.env[name];
+  if (raw == null || raw === "") return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+  return parsed;
+}
+
 function readLogLines() {
   if (!fs.existsSync(LOG_PATH)) return [];
   try {
@@ -75,6 +86,86 @@ function readRecentLogLines(maxLines = 400) {
 
 // --- Logging ---
 
+function formatLogArchiveTimestamp(date = new Date()) {
+  const y = date.getFullYear();
+  const mo = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  const h = String(date.getHours()).padStart(2, "0");
+  const mi = String(date.getMinutes()).padStart(2, "0");
+  const s = String(date.getSeconds()).padStart(2, "0");
+  return `${y}${mo}${d}-${h}${mi}${s}`;
+}
+
+function cleanupRotatedLogs() {
+  try {
+    const entries = fs
+      .readdirSync(DATA_DIR, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && /^results-\d{8}-\d{6}\.log$/.test(entry.name))
+      .map((entry) => {
+        const fullPath = path.join(DATA_DIR, entry.name);
+        let mtimeMs = 0;
+        try {
+          mtimeMs = fs.statSync(fullPath).mtimeMs;
+        } catch {
+          // Keep mtime at 0 if stat fails.
+        }
+        return { name: entry.name, fullPath, mtimeMs };
+      })
+      .sort((a, b) => b.mtimeMs - a.mtimeMs || b.name.localeCompare(a.name));
+    const toDelete = entries.slice(LOG_RETAIN_FILES);
+    for (const file of toDelete) {
+      try {
+        fs.unlinkSync(file.fullPath);
+      } catch (e) {
+        try {
+          console.error(`[flightbot] Failed to remove old log archive ${file.name}: ${e.message}`);
+        } catch {
+          // Ignore secondary logging failures.
+        }
+      }
+    }
+  } catch (e) {
+    try {
+      console.error(`[flightbot] Failed to cleanup log archives: ${e.message}`);
+    } catch {
+      // Ignore secondary logging failures.
+    }
+  }
+}
+
+function rotateLogIfNeeded() {
+  try {
+    const stats = fs.statSync(LOG_PATH);
+    if (!stats.isFile() || stats.size <= LOG_MAX_BYTES) return;
+    const archiveName = `results-${formatLogArchiveTimestamp()}.log`;
+    const archivePath = path.join(DATA_DIR, archiveName);
+    try {
+      fs.renameSync(LOG_PATH, archivePath);
+    } catch (e) {
+      try {
+        console.error(`[flightbot] Failed to rotate log file ${LOG_PATH}: ${e.message}`);
+      } catch {
+        // Ignore secondary logging failures.
+      }
+      return;
+    }
+    cleanupRotatedLogs();
+  } catch (e) {
+    if (e?.code !== "ENOENT") {
+      try {
+        console.error(`[flightbot] Failed to inspect log file ${LOG_PATH}: ${e.message}`);
+      } catch {
+        // Ignore secondary logging failures.
+      }
+    }
+  }
+}
+
+function appendToResultsLog(line) {
+  rotateLogIfNeeded();
+  fs.appendFileSync(LOG_PATH, line + "\n");
+}
+
 function log(msg) {
   const line = `[${new Date().toISOString()}] ${msg}`;
   try {
@@ -83,7 +174,7 @@ function log(msg) {
     // Ignore console failures so we can still attempt file logging.
   }
   try {
-    fs.appendFileSync(LOG_PATH, line + "\n");
+    appendToResultsLog(line);
   } catch (e) {
     try {
       console.error(`[flightbot] Failed to append to ${LOG_PATH}: ${e.message}`);
@@ -104,7 +195,7 @@ function logAlert(route, flight, alertType) {
     duration: flight.duration,
   };
   try {
-    fs.appendFileSync(LOG_PATH, JSON.stringify(record) + "\n");
+    appendToResultsLog(JSON.stringify(record));
   } catch (e) {
     log(`Failed to append alert record: ${e.message}`);
   }
@@ -832,6 +923,42 @@ function maskConfig(config) {
     anthropic: { ...config.anthropic, apiKey: "••••••" },
     telegram: { ...config.telegram, token: "••••••" },
   };
+}
+
+// Constant-time bearer token check for admin endpoints. Fails closed when
+// FLIGHTBOT_ADMIN_TOKEN is unset/empty so a misconfigured deploy cannot
+// accidentally expose /status or /config to the public internet.
+function requireAdminAuth(req, res, next) {
+  const expected = process.env.FLIGHTBOT_ADMIN_TOKEN;
+  if (!expected) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const header = req.get("authorization") || req.get("Authorization");
+  if (!header || typeof header !== "string") {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const match = /^Bearer\s+(.+)$/.exec(header);
+  if (!match) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  const presented = match[1].trim();
+  if (!presented) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const presentedBuf = Buffer.from(presented, "utf8");
+  const expectedBuf = Buffer.from(expected, "utf8");
+  if (presentedBuf.length !== expectedBuf.length) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (!crypto.timingSafeEqual(presentedBuf, expectedBuf)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  return next();
 }
 
 function deepMergePreservingSensitive(incoming, onDisk) {
@@ -3319,14 +3446,36 @@ init();
 const app = express();
 const PORT = process.env.PORT ?? 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: "128kb" }));
+
+// --- Per-IP rate limiter for /config writes ---
+// Lightweight in-memory limiter, applied ONLY to PUT /config (after auth).
+// Policy: 5 writes per minute per source IP. Older timestamps are trimmed on
+// each request so the Map cannot grow unboundedly for active IPs.
+const CONFIG_WRITE_RATE_WINDOW_MS = 60_000;
+const CONFIG_WRITE_RATE_MAX = 5;
+const configWriteHits = new Map();
+
+function configWriteRateLimit(req, res, next) {
+  const ip = req.ip || "unknown";
+  const now = Date.now();
+  const cutoff = now - CONFIG_WRITE_RATE_WINDOW_MS;
+  const recent = (configWriteHits.get(ip) || []).filter((t) => t > cutoff);
+  if (recent.length >= CONFIG_WRITE_RATE_MAX) {
+    configWriteHits.set(ip, recent);
+    return res.status(429).json({ error: "Rate limit exceeded" });
+  }
+  recent.push(now);
+  configWriteHits.set(ip, recent);
+  return next();
+}
 
 app.get("/", (req, res) => {
   res.setHeader("Content-Type", "text/html");
   res.send(UI_HTML);
 });
 
-app.get("/config", (req, res) => {
+app.get("/config", requireAdminAuth, (req, res) => {
   try {
     const { config, revision } = readFlightbotConfig(DATA_DIR);
     const publicShape = stripInternalConfigFields(config);
@@ -3336,7 +3485,7 @@ app.get("/config", (req, res) => {
   }
 });
 
-app.get("/status", (req, res) => {
+app.get("/status", requireAdminAuth, (req, res) => {
   try {
     res.json(buildStatusReadModel());
   } catch (e) {
@@ -3344,7 +3493,18 @@ app.get("/status", (req, res) => {
   }
 });
 
-app.put("/config", (req, res) => {
+app.put("/config", requireAdminAuth, configWriteRateLimit, (req, res) => {
+  const ip = req.ip || "unknown";
+  // Track outcome so we emit exactly one audit line at request completion,
+  // regardless of which branch the handler takes. Default to "invalid" so
+  // any unexpected/early exit is recorded as a non-success outcome rather
+  // than silently dropped. Never include token/headers/payload contents.
+  let auditResult = "invalid";
+  let auditRevision = null;
+  res.on("finish", () => {
+    log(`[audit] PUT /config ip=${ip} result=${auditResult} revision=${auditRevision}`);
+  });
+
   const incoming = req.body;
   const { expectedRevision: clientRevision, ...patch } = incoming;
   const expectedRevisionOpt =
@@ -3356,6 +3516,7 @@ app.put("/config", (req, res) => {
 
   // Validate schedule
   if (patch.schedule !== undefined && !cron.validate(patch.schedule)) {
+    auditResult = "invalid";
     return res.status(400).json({ error: `Invalid cron expression: "${patch.schedule}"` });
   }
 
@@ -3363,13 +3524,16 @@ app.put("/config", (req, res) => {
   if (patch.routes) {
     for (const r of patch.routes) {
       if (!r.name || !r.from || !r.to || !r.departureDate) {
+        auditResult = "invalid";
         return res.status(400).json({ error: "Route missing required field (name, from, to, departureDate)" });
       }
       if (!/^\d{4}-\d{2}-\d{2}$/.test(r.departureDate)) {
+        auditResult = "invalid";
         return res.status(400).json({ error: `Route "${r.name}": departureDate must be YYYY-MM-DD` });
       }
       if (r.flexDays !== undefined && r.flexDays !== null) {
         if (!Number.isInteger(r.flexDays) || r.flexDays < 0 || r.flexDays > 7) {
+          auditResult = "invalid";
           return res.status(400).json({ error: `Route "${r.name}": flexDays must be integer 0–7` });
         }
       }
@@ -3386,11 +3550,16 @@ app.put("/config", (req, res) => {
       scheduled = ok ? "live" : "restart-required";
     }
     const { revision } = readFlightbotConfig(DATA_DIR);
+    auditResult = "ok";
+    auditRevision = revision;
     res.json({ ok: true, scheduled, revision });
   } catch (e) {
     if (e instanceof ConfigRevisionConflict) {
+      auditResult = "conflict";
+      auditRevision = e.actualRevision;
       return res.status(409).json({ error: e.message, revision: e.actualRevision });
     }
+    auditResult = "invalid";
     res.status(500).json({ error: e.message });
   }
 });
