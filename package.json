@@ -13,8 +13,8 @@
     "install-browsers": "npx playwright install chromium",
     "dashboard:dev": "npm run dev -w @flightbot/web",
     "web:dev": "npm run dashboard:dev",
-    "vercel:preview": "npx --yes vercel deploy --yes",
-    "vercel:prod": "npx --yes vercel deploy --prod --yes"
+    "vercel:preview": "npx --yes vercel deploy --cwd apps/web --yes",
+    "vercel:prod": "npx --yes vercel deploy --cwd apps/web --prod --yes"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.85.0",

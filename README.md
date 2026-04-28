@@ -61,10 +61,10 @@ For the first production rollout, it is fine to configure environment variables 
 The Vercel project name is `flightbot`, and the deployed dashboard source lives under `apps/web`.
 
 - Keep the Vercel project **Root Directory** set to `apps/web` in project settings.
-- This repo also includes a root `vercel.json` with workspace-aware build command for consistency.
 - Manual deploy shortcuts from repo root:
   - `npm run vercel:preview`
   - `npm run vercel:prod`
+- The deploy scripts force `--cwd apps/web` so CLI deploys stay aligned with the dashboard source.
 
 ### Docker
 
