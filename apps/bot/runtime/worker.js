@@ -14,6 +14,7 @@ export function createPriceStore(dataDir) {
   }
 
   function savePrices(prices) {
+    fs.mkdirSync(path.dirname(pricesPath), { recursive: true });
     fs.writeFileSync(pricesPath, JSON.stringify(prices, null, 2));
   }
 

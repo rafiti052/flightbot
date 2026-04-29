@@ -6,6 +6,34 @@ import YAML from "yaml";
 const CONFIG_YML = "config.yml";
 const CONFIG_JSON = "config.json";
 
+/**
+ * Resolve the bot data directory from env or a known local fallback.
+ * @param {{ envValue?: string | null, fallbackDir?: string | null, relativeTo?: string | null, onFallback?: (fallbackDir: string) => void }} [options]
+ */
+export function resolveFlightbotDataDir(options = {}) {
+  const envValue = typeof options.envValue === "string" ? options.envValue.trim() : "";
+  const relativeTo = typeof options.relativeTo === "string" && options.relativeTo ? options.relativeTo : process.cwd();
+
+  if (envValue) {
+    return {
+      dataDir: path.resolve(relativeTo, envValue),
+      usedFallback: false,
+    };
+  }
+
+  const fallbackDir =
+    typeof options.fallbackDir === "string" && options.fallbackDir ? path.resolve(options.fallbackDir) : path.resolve(relativeTo);
+
+  if (typeof options.onFallback === "function") {
+    options.onFallback(fallbackDir);
+  }
+
+  return {
+    dataDir: fallbackDir,
+    usedFallback: true,
+  };
+}
+
 /** @param {string} dataDir */
 export function getConfigYmlPath(dataDir) {
   return path.join(dataDir, CONFIG_YML);

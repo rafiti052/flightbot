@@ -25,7 +25,7 @@ pnpm run install-browsers
 
 The bot prefers **`config.yml`** in **`FLIGHTBOT_DATA_DIR`** (shared with the optional Next.js UI). On first startup, if only **`config.json`** exists there, it is migrated once to `config.yml`.
 
-Set **`FLIGHTBOT_DATA_DIR`** to the directory that contains the bot's runtime state. During this refactor, the local-dev default remains the repo root when `FLIGHTBOT_DATA_DIR` is unset, but explicit configuration is recommended for any persistent or shared environment.
+Set **`FLIGHTBOT_DATA_DIR`** to the directory that contains the bot's runtime state. For local development, `scripts/start-bot.sh` still falls back to the repo root when `FLIGHTBOT_DATA_DIR` is unset. For Docker, AWS, PM2, or any shared environment, set it explicitly and keep runtime state outside the repo checkout.
 
 ### Runtime state in `FLIGHTBOT_DATA_DIR`
 
@@ -36,7 +36,7 @@ The bot reads and writes its runtime state from `FLIGHTBOT_DATA_DIR`:
 - `results.log` - append-only log for human-readable lines and JSON alert records.
 - `.flightbot/last-run.json` - last-run status snapshot used by the dashboard.
 
-Current local-dev decision during this refactor: if `FLIGHTBOT_DATA_DIR` is not set, the bot falls back to the repo root as a temporary data directory. That keeps existing local workflows working while runtime ownership moves fully under `apps/bot`.
+Current local-dev fallback: `scripts/start-bot.sh` uses the repo root only when `FLIGHTBOT_DATA_DIR` is unset. Treat that as a temporary convenience for local work, not a deploy default.
 
 ### Log rotation and retention
 
@@ -79,7 +79,11 @@ The Vercel project name is `flightbot`, and the deployed dashboard source lives 
 
 ### Docker
 
-`docker compose up` starts the **flightbot** bot service (port 3000). The bot reads runtime state from `FLIGHTBOT_DATA_DIR` inside the container, with the host directory supplied by `FLIGHTBOT_HOST_DATA_DIR`.
+`docker compose up` starts the **flightbot** bot service (port 3000).
+
+- Set `FLIGHTBOT_HOST_DATA_DIR` to an absolute host path outside the repo checkout.
+- Docker mounts that host directory into the container and sets `FLIGHTBOT_DATA_DIR=/data`.
+- Keep `config.yml`, `prices.json`, `results.log`, and `.flightbot/` in that host-owned data directory.
 
 ---
 
@@ -128,10 +132,12 @@ Uses standard cron syntax. Default `"0 7,13,20 * * *"` runs at 7:00, 13:00, and 
 ## Running
 
 ```bash
-FLIGHTBOT_DATA_DIR="$PWD" node apps/bot/bot.js
+cp .env.example bot.env.local
+# edit bot.env.local
+./scripts/start-bot.sh
 ```
 
-The bot runs once immediately on startup, then follows the cron schedule.
+`scripts/start-bot.sh` loads `bot.env.local`, normalizes `FLIGHTBOT_DATA_DIR`, creates missing runtime files, and starts `node apps/bot/bot.js`. If `FLIGHTBOT_DATA_DIR` is unset there, local dev temporarily falls back to the repo root.
 
 ---
 
@@ -153,6 +159,8 @@ npm install -g pm2
 FLIGHTBOT_DATA_DIR=/opt/flightbot/data pm2 start apps/bot/bot.js --name flight-bot --update-env
 pm2 save && pm2 startup
 ```
+
+Use a dedicated data directory outside the repo checkout, with `config.yml` already present there.
 
 ---
 

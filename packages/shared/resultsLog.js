@@ -41,10 +41,28 @@ export function createResultsLogger(options) {
           }
         };
 
+  function ensureDataDir() {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+
+  ensureDataDir();
+
+  function createArchivePath() {
+    const baseName = `results-${formatLogArchiveTimestamp()}`;
+    let archivePath = path.join(dataDir, `${baseName}.log`);
+    let suffix = 1;
+    while (fs.existsSync(archivePath)) {
+      archivePath = path.join(dataDir, `${baseName}-${suffix}.log`);
+      suffix += 1;
+    }
+    return archivePath;
+  }
+
   function listArchiveEntries() {
+    if (!fs.existsSync(dataDir)) return [];
     return fs
       .readdirSync(dataDir, { withFileTypes: true })
-      .filter((entry) => entry.isFile() && /^results-\d{8}-\d{6}\.log$/.test(entry.name))
+      .filter((entry) => entry.isFile() && /^results-\d{8}-\d{6}(?:-\d+)?\.log$/.test(entry.name))
       .map((entry) => {
         const fullPath = path.join(dataDir, entry.name);
         let mtimeMs = 0;
@@ -86,6 +104,7 @@ export function createResultsLogger(options) {
       let bytesScanned = 0;
       let newlineCount = 0;
       let collected = "";
+      let truncatedStart = false;
 
       while (position > 0 && bytesScanned < maxBytes && newlineCount <= targetLines) {
         const bytesToRead = Math.min(chunkSize, position, maxBytes - bytesScanned);
@@ -98,7 +117,11 @@ export function createResultsLogger(options) {
         newlineCount += countNewlines(chunk);
       }
 
-      const lines = collected.split(/\r?\n/).filter(Boolean);
+      truncatedStart = position > 0;
+      let lines = collected.split(/\r?\n/).filter(Boolean);
+      if (truncatedStart && lines.length > 0) {
+        lines = lines.slice(1);
+      }
       if (lines.length <= targetLines) return lines;
       return lines.slice(-targetLines);
     } catch {
@@ -151,9 +174,10 @@ export function createResultsLogger(options) {
 
   function rotateIfNeeded() {
     try {
+      ensureDataDir();
       const stats = fs.statSync(logPath);
       if (!stats.isFile() || stats.size <= maxBytes) return;
-      const archivePath = path.join(dataDir, `results-${formatLogArchiveTimestamp()}.log`);
+      const archivePath = createArchivePath();
       fs.renameSync(logPath, archivePath);
       pruneArchives();
     } catch (e) {
@@ -168,12 +192,21 @@ export function createResultsLogger(options) {
   }
 
   function appendLine(line) {
-    rotateIfNeeded();
-    fs.appendFileSync(logPath, line + "\n");
+    try {
+      ensureDataDir();
+      rotateIfNeeded();
+      fs.appendFileSync(logPath, `${String(line)}\n`);
+    } catch (e) {
+      onError(`[flightbot] Failed appending to ${logPath}: ${e.message}`);
+    }
   }
 
   function appendJson(record) {
-    appendLine(JSON.stringify(record));
+    try {
+      appendLine(JSON.stringify(record));
+    } catch (e) {
+      onError(`[flightbot] Failed serializing log record for ${logPath}: ${e.message}`);
+    }
   }
 
   return {

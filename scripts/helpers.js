@@ -1,9 +1,19 @@
 import fs from "fs";
 import path from "path";
-import { migrateJsonToYamlIfNeeded, readFlightbotConfig } from "@flightbot/shared";
+import { fileURLToPath } from "node:url";
+import { migrateJsonToYamlIfNeeded, readFlightbotConfig, resolveFlightbotDataDir } from "@flightbot/shared";
 
 export function resolveDataDir() {
-  return process.env.FLIGHTBOT_DATA_DIR || process.cwd();
+  const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const { dataDir } = resolveFlightbotDataDir({
+    envValue: process.env.FLIGHTBOT_DATA_DIR,
+    fallbackDir: repoRoot,
+    relativeTo: repoRoot,
+    onFallback: (fallbackDir) => {
+      console.warn(`[flightbot] FLIGHTBOT_DATA_DIR is not set; using the repo root for local scripts: ${fallbackDir}`);
+    },
+  });
+  return dataDir;
 }
 
 export function loadConfig() {
