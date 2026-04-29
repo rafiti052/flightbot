@@ -6,16 +6,15 @@
     "dev": "next dev -p 3001 -H 0.0.0.0",
     "build": "next build",
     "start": "next start -p 3001",
-    "test:unit": "npx --yes tsx --test \"./**/__tests__/*.test.ts\"",
-    "e2e": "playwright test",
-    "e2e:headed": "playwright test --headed"
+    "test:unit": "pnpm dlx tsx --test \"./**/__tests__/*.test.ts\"",
+    "e2e": "pnpm exec playwright test",
+    "e2e:headed": "pnpm exec playwright test --headed"
   },
   "dependencies": {
     "next": "^14.2.18",
     "next-auth": "^4.24.7",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "yaml": "^2.8.1"
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",

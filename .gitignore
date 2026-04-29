@@ -13,3 +13,6 @@ apps/web/.next/
 docs/
 .vercel
 .env*.local
+bot.env.local
+docker.env
+apps/web/.env.local
