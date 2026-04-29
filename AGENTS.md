@@ -49,14 +49,21 @@ During the current refactor, local development still temporarily uses the repo r
 ## Running
 
 ```bash
-pnpm install && pnpm run install-browsers
-FLIGHTBOT_DATA_DIR="$PWD" node apps/bot/bot.js
+pnpm install
+pnpm run install-browsers
+cp .env.example bot.env.local
+# edit bot.env.local
+./scripts/start-bot.sh
 ```
 
 ## Docker
 
 ```bash
-docker-compose up -d
+./bootstrap/aws/init-datadir.sh /opt/flightbot/data
+# edit /opt/flightbot/data/config.yml
+cp .env.example docker.env
+# set FLIGHTBOT_HOST_DATA_DIR=/opt/flightbot/data in docker.env
+./scripts/deploy.sh
 ```
 
 ## Dependencies
