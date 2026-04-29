@@ -6,7 +6,7 @@
     "dev": "next dev -p 3001 -H 0.0.0.0",
     "build": "next build",
     "start": "next start -p 3001",
-    "test:unit": "pnpm dlx tsx --test \"./**/__tests__/*.test.ts\"",
+    "test:unit": "pnpm dlx tsx --test ./lib/__tests__/*.test.ts",
     "e2e": "pnpm exec playwright test",
     "e2e:headed": "pnpm exec playwright test --headed"
   },
