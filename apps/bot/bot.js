@@ -1,11 +1,14 @@
 import cron from "node-cron";
 import express from "express";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   migrateJsonToYamlIfNeeded,
   readFlightbotConfig,
   writeFlightbotConfigAtomic,
   writeLastRunMarker,
   createResultsLogger,
+  resolveFlightbotDataDir,
 } from "@flightbot/shared";
 import {
   parseIntEnv,
@@ -28,19 +31,15 @@ import { createWorkerOrchestrator } from "./runtime/orchestration.js";
 import { createScrapingWorker } from "./runtime/scraping.js";
 import { createNotifier } from "./runtime/notify.js";
 
-function resolveDataDir() {
-  if (process.env.FLIGHTBOT_DATA_DIR) {
-    return process.env.FLIGHTBOT_DATA_DIR;
-  }
-
-  const fallbackDir = process.cwd();
-  console.warn(
-    `[flightbot] FLIGHTBOT_DATA_DIR is not set; falling back to process.cwd() for local use: ${fallbackDir}`,
-  );
-  return fallbackDir;
-}
-
-const DATA_DIR = resolveDataDir();
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const { dataDir: DATA_DIR } = resolveFlightbotDataDir({
+  envValue: process.env.FLIGHTBOT_DATA_DIR,
+  fallbackDir: REPO_ROOT,
+  relativeTo: REPO_ROOT,
+  onFallback: (fallbackDir) => {
+    console.warn(`[flightbot] FLIGHTBOT_DATA_DIR is not set; falling back to the repo root for local use: ${fallbackDir}`);
+  },
+});
 const LOG_MAX_BYTES = parseIntEnv("FLIGHTBOT_LOG_MAX_BYTES", 20 * 1024 * 1024);
 const LOG_RETAIN_FILES = parseIntEnv("FLIGHTBOT_LOG_RETAIN_FILES", 7);
 const LOG_MAX_AGE_DAYS_RAW = parseIntEnv("FLIGHTBOT_LOG_MAX_AGE_DAYS", 0);

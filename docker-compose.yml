@@ -11,4 +11,6 @@ services:
     environment:
       FLIGHTBOT_DATA_DIR: ${FLIGHTBOT_DATA_DIR:-/data}
     volumes:
-      - ${FLIGHTBOT_HOST_DATA_DIR:-./.flightbot/docker}:${FLIGHTBOT_DATA_DIR:-/data}
+      - type: bind
+        source: ${FLIGHTBOT_HOST_DATA_DIR:?Set FLIGHTBOT_HOST_DATA_DIR to an absolute host data directory outside the repo checkout}
+        target: ${FLIGHTBOT_DATA_DIR:-/data}

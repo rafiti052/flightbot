@@ -1,5 +1,5 @@
-# Copy to config.yml in your data directory and replace placeholders.
-# Never commit the filled config.yml (keep it only on the server / volume).
+# Copy to config.yml in your host data directory and replace placeholders.
+# Never commit the filled config.yml (keep it only in FLIGHTBOT_HOST_DATA_DIR / the server volume).
 
 schemaVersion: 1
 schedule: "0 7,13,20 * * *"
