@@ -35,8 +35,8 @@ if [[ ! -f "${FLIGHTBOT_DATA_DIR}/prices.json" ]]; then
   printf '{}\n' > "${FLIGHTBOT_DATA_DIR}/prices.json"
 fi
 
-if [[ ! -f "${FLIGHTBOT_DATA_DIR}/config.yml" && ! -f "${FLIGHTBOT_DATA_DIR}/config.json" ]]; then
-  echo "Missing ${FLIGHTBOT_DATA_DIR}/config.yml (or legacy config.json). Point FLIGHTBOT_DATA_DIR at your runtime data dir in ${ENV_FILE}." >&2
+if [[ ! -f "${FLIGHTBOT_DATA_DIR}/config.yml" ]]; then
+  echo "Missing ${FLIGHTBOT_DATA_DIR}/config.yml. Point FLIGHTBOT_DATA_DIR at your runtime data dir in ${ENV_FILE}." >&2
   exit 1
 fi
 

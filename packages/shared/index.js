@@ -4,7 +4,6 @@ import { randomUUID } from "node:crypto";
 import YAML from "yaml";
 
 const CONFIG_YML = "config.yml";
-const CONFIG_JSON = "config.json";
 
 /**
  * Resolve the bot data directory from env or a known local fallback.
@@ -40,11 +39,6 @@ export function getConfigYmlPath(dataDir) {
 }
 
 /** @param {string} dataDir */
-export function getConfigJsonPath(dataDir) {
-  return path.join(dataDir, CONFIG_JSON);
-}
-
-/** @param {string} dataDir */
 export function getLastRunDir(dataDir) {
   return path.join(dataDir, ".flightbot");
 }
@@ -52,45 +46,6 @@ export function getLastRunDir(dataDir) {
 /** @param {string} dataDir */
 export function getLastRunPath(dataDir) {
   return path.join(getLastRunDir(dataDir), "last-run.json");
-}
-
-/**
- * If config.yml is missing and config.json exists, write config.yml from JSON (one-time).
- * @param {string} dataDir
- * @returns {{ migrated: boolean, message?: string }}
- */
-export function migrateJsonToYamlIfNeeded(dataDir) {
-  const ymlPath = getConfigYmlPath(dataDir);
-  if (fs.existsSync(ymlPath)) {
-    return { migrated: false };
-  }
-  const jsonPath = getConfigJsonPath(dataDir);
-  if (!fs.existsSync(jsonPath)) {
-    return { migrated: false, message: "Neither config.yml nor config.json found" };
-  }
-  let raw;
-  try {
-    raw = fs.readFileSync(jsonPath, "utf-8");
-  } catch (e) {
-    throw new Error(`Failed to read ${jsonPath}: ${e.message}`);
-  }
-  let doc;
-  try {
-    doc = JSON.parse(raw);
-  } catch (e) {
-    throw new Error(`Legacy config.json is invalid JSON: ${e.message}`);
-  }
-  const now = new Date().toISOString();
-  const out = {
-    ...doc,
-    schemaVersion: typeof doc.schemaVersion === "number" ? doc.schemaVersion : 1,
-    _configMeta: {
-      revision: 0,
-      updatedAt: now,
-    },
-  };
-  atomicWriteText(ymlPath, YAML.stringify(out, { lineWidth: 120 }));
-  return { migrated: true, message: `Migrated ${jsonPath} → ${ymlPath}` };
 }
 
 /**
@@ -138,7 +93,7 @@ function normalizeDocument(doc) {
 export function readFlightbotConfig(dataDir) {
   const ymlPath = getConfigYmlPath(dataDir);
   if (!fs.existsSync(ymlPath)) {
-    throw new Error(`config.yml not found at ${ymlPath}. Create it or keep config.json for one-time migration.`);
+    throw new Error(`config.yml not found at ${ymlPath}. Create it before starting the bot.`);
   }
   const maxYamlBytes = 2 * 1024 * 1024;
   const st = fs.statSync(ymlPath);

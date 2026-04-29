@@ -3,7 +3,6 @@ import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  migrateJsonToYamlIfNeeded,
   readFlightbotConfig,
   writeFlightbotConfigAtomic,
   writeLastRunMarker,
@@ -70,13 +69,6 @@ function enforceStartupLogRetention() {
     log(`Startup log retention failed: ${formatError(error)}`);
   }
 }
-
-(() => {
-  const m = migrateJsonToYamlIfNeeded(DATA_DIR);
-  if (m.migrated && m.message) {
-    console.log(`[flightbot] ${m.message}`);
-  }
-})();
 
 enforceStartupLogRetention();
 

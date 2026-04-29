@@ -23,7 +23,7 @@ pnpm run install-browsers
 
 ## Configuration
 
-The bot prefers **`config.yml`** in **`FLIGHTBOT_DATA_DIR`** (shared with the optional Next.js UI). On first startup, if only **`config.json`** exists there, it is migrated once to `config.yml`.
+The bot uses **`config.yml`** in **`FLIGHTBOT_DATA_DIR`** (shared with the optional Next.js UI).
 
 Set **`FLIGHTBOT_DATA_DIR`** to the directory that contains the bot's runtime state. For local development, `scripts/start-bot.sh` still falls back to the repo root when `FLIGHTBOT_DATA_DIR` is unset. For Docker, AWS, PM2, or any shared environment, set it explicitly and keep runtime state outside the repo checkout.
 
@@ -31,7 +31,7 @@ Set **`FLIGHTBOT_DATA_DIR`** to the directory that contains the bot's runtime st
 
 The bot reads and writes its runtime state from `FLIGHTBOT_DATA_DIR`:
 
-- `config.yml` - main config (preferred). If only legacy `config.json` exists there, startup migrates it once.
+- `config.yml` - main config.
 - `prices.json` - persisted alert history per route.
 - `results.log` - append-only log for human-readable lines and JSON alert records.
 - `.flightbot/last-run.json` - last-run status snapshot used by the dashboard.
@@ -86,21 +86,6 @@ The Vercel project name is `flightbot`, and the deployed dashboard source lives 
 - Keep `config.yml`, `prices.json`, `results.log`, and `.flightbot/` in that host-owned data directory.
 
 ---
-
-## Legacy JSON shape (still valid after migration)
-
-Edit `config.json` before first run if you have not migrated yet; after migration, edit `config.yml` instead.
-
-```json
-{
-  "telegram": {
-    "token": "YOUR_BOT_TOKEN_HERE",
-    "chatId": "YOUR_CHAT_ID_HERE"
-  },
-  "schedule": "0 7,13,20 * * *",
-  "routes": [...]
-}
-```
 
 ### Getting your Telegram credentials
 

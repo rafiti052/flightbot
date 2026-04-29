@@ -8,6 +8,7 @@ apps/web/.next/
 .claude/settings.local.json
 .projectpal/
 .flightbot/
+.tmp/
 
 # Local-only docs (kept on disk, never versioned)
 docs/

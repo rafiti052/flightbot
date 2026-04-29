@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "node:url";
-import { migrateJsonToYamlIfNeeded, readFlightbotConfig, resolveFlightbotDataDir } from "@flightbot/shared";
+import { readFlightbotConfig, resolveFlightbotDataDir } from "@flightbot/shared";
 
 export function resolveDataDir() {
   const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -18,10 +18,6 @@ export function resolveDataDir() {
 
 export function loadConfig() {
   const dataDir = resolveDataDir();
-  const migration = migrateJsonToYamlIfNeeded(dataDir);
-  if (migration.migrated && migration.message) {
-    console.log(`[flightbot] ${migration.message}`);
-  }
   const { config } = readFlightbotConfig(dataDir);
   return { config, dataDir };
 }
@@ -31,5 +27,6 @@ export function resolveOutputPath(filename) {
 }
 
 export function writeOutputFile(filePath, content) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, content);
 }

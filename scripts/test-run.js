@@ -1,6 +1,6 @@
 /**
  * Smoke test: scrapes the first active route using Claude vision and sends a Telegram message.
- * Run with: node test-run.js
+ * Run with: node scripts/test-run.js
  */
 
 import { chromium } from "playwright";
@@ -71,7 +71,7 @@ await page.waitForTimeout(2000);
 const screenshot = await page.screenshot({ fullPage: true });
 await browser.close();
 
-const screenshotPath = resolveOutputPath("test-screenshot.png");
+const screenshotPath = resolveOutputPath(".tmp/flightbot/test-run.png");
 writeOutputFile(screenshotPath, screenshot);
 console.log(`Screenshot saved to ${screenshotPath}`);
 

@@ -1,6 +1,6 @@
 /**
  * Navigates to Google Flights for the first active route and saves a screenshot.
- * Run with: node screenshot.js
+ * Run with: node scripts/screenshot.js
  */
 
 import { chromium } from "playwright";
@@ -50,7 +50,7 @@ try {
 }
 await page.waitForTimeout(3000);
 
-const screenshotPath = resolveOutputPath("test-screenshot.png");
+const screenshotPath = resolveOutputPath(".tmp/flightbot/screenshot.png");
 await page.screenshot({ path: screenshotPath, fullPage: true });
 await browser.close();
 
