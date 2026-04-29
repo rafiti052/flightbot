@@ -4,14 +4,18 @@ Node.js bot that scrapes Google Flights via Playwright, uses Claude vision (Haik
 
 ## Architecture
 
-- `**bot.js**` — entire bot in a single file (entry point, scraping, AI extraction, alerting)
-- `**config.json**` — runtime config (API keys, routes, schedule). Never commit real keys.
-- `**prices.json**` — persisted price state per route. Delete to reset alert history.
-- `**results.log**` — append-only log of human-readable lines + JSON alert records
+- `**apps/bot/bot.js**` — bot runtime entry point and composition layer
+- `**apps/bot/runtime/**` — runtime modules for scraping, orchestration, worker state, API helpers, and notifications
+- `**FLIGHTBOT_DATA_DIR/config.yml**` — runtime config (API keys, routes, schedule). Never commit real keys.
+- `**FLIGHTBOT_DATA_DIR/prices.json**` — persisted price state per route. Delete to reset alert history.
+- `**FLIGHTBOT_DATA_DIR/results.log**` — append-only log of human-readable lines + JSON alert records
+- `**FLIGHTBOT_DATA_DIR/.flightbot/last-run.json**` — last-run status snapshot for the dashboard
+
+During the current refactor, local development still temporarily uses the repo root as the data dir when `FLIGHTBOT_DATA_DIR` is unset.
 
 ## Key flow
 
-1. `loadConfig()` reads `config.json` on startup
+1. `loadConfig()` reads `config.yml` from `FLIGHTBOT_DATA_DIR` on startup
 2. `run(config)` executes immediately and then on cron schedule
 3. For each active route, `dateVariants()` expands `flexDays` into multiple departure offsets
 4. `scrapeFlights()` launches headless Chromium, navigates Google Flights, takes a full-page screenshot
@@ -45,8 +49,8 @@ Node.js bot that scrapes Google Flights via Playwright, uses Claude vision (Haik
 ## Running
 
 ```bash
-npm install && npm run install-browsers
-node bot.js
+pnpm install && pnpm run install-browsers
+FLIGHTBOT_DATA_DIR="$PWD" node apps/bot/bot.js
 ```
 
 ## Docker
@@ -66,5 +70,5 @@ docker-compose up -d
 - Rate limiting: 3–6s random delay between date variants; 5s between routes
 - Filters (`maxStops`, `maxDurationHours`) are applied after Claude extraction, not at scrape time
 - `prices.json` uses route `name` as key — changing a route name resets its alert history
+- Runtime state ownership is by `FLIGHTBOT_DATA_DIR`, not by the repo root or Vercel
 - The bot uses `claude-haiku-4-5-20251001` for cost efficiency on vision tasks
-

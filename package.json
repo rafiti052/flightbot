@@ -2,25 +2,17 @@
   "name": "flight-bot",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
-  "main": "bot.js",
-  "workspaces": [
-    "packages/*",
-    "apps/*"
-  ],
+  "packageManager": "pnpm@9.10.0",
   "scripts": {
-    "start": "node bot.js",
-    "install-browsers": "npx playwright install chromium",
-    "dashboard:dev": "npm run dev -w @flightbot/web",
-    "web:dev": "npm run dashboard:dev",
-    "vercel:preview": "npx --yes vercel deploy --cwd apps/web --yes",
-    "vercel:prod": "npx --yes vercel deploy --cwd apps/web --prod --yes"
+    "dev": "concurrently -n bot,web -c cyan,magenta \"./scripts/start-bot.sh\" \"pnpm --filter @flightbot/web dev\"",
+    "start": "pnpm --filter @flightbot/bot start",
+    "install-browsers": "pnpm --filter @flightbot/bot install-browsers",
+    "dashboard:dev": "pnpm --filter @flightbot/web dev",
+    "web:dev": "pnpm run dashboard:dev",
+    "vercel:preview": "pnpm dlx vercel deploy --cwd apps/web --yes",
+    "vercel:prod": "pnpm dlx vercel deploy --cwd apps/web --prod --yes"
   },
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.85.0",
-    "@flightbot/shared": "file:packages/shared",
-    "express": "^5.2.1",
-    "node-cron": "^3.0.3",
-    "playwright": "^1.43.0"
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }

@@ -1,7 +1,5 @@
 import cron from "node-cron";
 import express from "express";
-import path from "path";
-import { fileURLToPath } from "url";
 import {
   migrateJsonToYamlIfNeeded,
   readFlightbotConfig,
@@ -22,22 +20,36 @@ import {
   summarizeRecentLogActivity,
   deriveRouteStateSummary,
   buildRecentActivity,
-} from "./packages/runtime/core.js";
-import { createPriceStore, createRuntimeLogger } from "./packages/runtime/worker.js";
-import { requireAdminAuth, createConfigWriteRateLimit } from "./packages/runtime/api.js";
-import { registerApiRoutes } from "./packages/runtime/http.js";
-import { createWorkerOrchestrator } from "./packages/runtime/orchestration.js";
-import { createScrapingWorker } from "./packages/runtime/scraping.js";
-import { createNotifier } from "./packages/runtime/notify.js";
+} from "./runtime/core.js";
+import { createPriceStore, createRuntimeLogger } from "./runtime/worker.js";
+import { requireAdminAuth, createConfigWriteRateLimit } from "./runtime/api.js";
+import { registerApiRoutes } from "./runtime/http.js";
+import { createWorkerOrchestrator } from "./runtime/orchestration.js";
+import { createScrapingWorker } from "./runtime/scraping.js";
+import { createNotifier } from "./runtime/notify.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = process.env.FLIGHTBOT_DATA_DIR || __dirname;
+function resolveDataDir() {
+  if (process.env.FLIGHTBOT_DATA_DIR) {
+    return process.env.FLIGHTBOT_DATA_DIR;
+  }
+
+  const fallbackDir = process.cwd();
+  console.warn(
+    `[flightbot] FLIGHTBOT_DATA_DIR is not set; falling back to process.cwd() for local use: ${fallbackDir}`,
+  );
+  return fallbackDir;
+}
+
+const DATA_DIR = resolveDataDir();
 const LOG_MAX_BYTES = parseIntEnv("FLIGHTBOT_LOG_MAX_BYTES", 20 * 1024 * 1024);
 const LOG_RETAIN_FILES = parseIntEnv("FLIGHTBOT_LOG_RETAIN_FILES", 7);
+const LOG_MAX_AGE_DAYS_RAW = parseIntEnv("FLIGHTBOT_LOG_MAX_AGE_DAYS", 0);
+const LOG_MAX_AGE_DAYS = LOG_MAX_AGE_DAYS_RAW > 0 ? LOG_MAX_AGE_DAYS_RAW : null;
 const resultsLog = createResultsLogger({
   dataDir: DATA_DIR,
   maxBytes: LOG_MAX_BYTES,
   retainFiles: LOG_RETAIN_FILES,
+  maxAgeDays: LOG_MAX_AGE_DAYS,
   onError: (msg) => {
     try {
       console.error(msg);
@@ -50,12 +62,25 @@ const { loadPrices, savePrices } = createPriceStore(DATA_DIR);
 const { log, logAlert } = createRuntimeLogger(resultsLog);
 const { sendRouteAlert } = createNotifier({ log, formatMessage });
 
+function enforceStartupLogRetention() {
+  if (typeof resultsLog.enforceRetention !== "function") return;
+
+  try {
+    resultsLog.enforceRetention();
+  } catch (error) {
+    log(`Startup log retention failed: ${formatError(error)}`);
+  }
+}
+
 (() => {
   const m = migrateJsonToYamlIfNeeded(DATA_DIR);
   if (m.migrated && m.message) {
     console.log(`[flightbot] ${m.message}`);
   }
 })();
+
+enforceStartupLogRetention();
+
 const RUN_LOCK_STALE_MS = 6 * 60 * 60 * 1000;
 
 function loadConfig() {
@@ -74,9 +99,9 @@ function buildStatusReadModel() {
   const config = loadConfig();
   const prices = loadPrices();
   const runState = workerOrchestrator.getRunState();
-  const logLines = resultsLog.readAllLines();
-  const recentLogLines = resultsLog.readRecentLines();
-  const logSummary = summarizeRecentLogActivity(logLines);
+  const summaryLogLines = resultsLog.readRecentLines(4000, { maxBytes: 4 * 1024 * 1024 });
+  const recentLogLines = resultsLog.readRecentLines(400, { maxBytes: 512 * 1024 });
+  const logSummary = summarizeRecentLogActivity(summaryLogLines);
   const recentActivity = buildRecentActivity(recentLogLines);
   const routes = Array.isArray(config.routes) ? config.routes : [];
   const activeRoutes = routes.filter((route) => route.active);
@@ -112,8 +137,6 @@ function buildStatusReadModel() {
   };
 }
 
-// --- Main run loop ---
-
 async function run(config) {
   log("=== Bot run started ===");
   const prices = loadPrices();
@@ -131,9 +154,8 @@ async function run(config) {
     log(`[${route.name}] Checking...`);
 
     const variants = dateVariants(route);
-
-    // Scrape variants sequentially to avoid bot detection and resource exhaustion
     const variantResults = [];
+
     for (const variant of variants) {
       const label = variant._dateLabel ? ` (${variant._dateLabel})` : "";
       log(`[${route.name}]${label} Scraping...`);
@@ -146,7 +168,7 @@ async function run(config) {
         log(`[${route.name}]${label} Scrape error: ${e.message}`);
         variantResults.push([]);
       }
-      // Random delay between requests to avoid bot detection
+
       await new Promise((r) => setTimeout(r, 3000 + Math.random() * 3000));
     }
 
@@ -193,7 +215,6 @@ async function run(config) {
       savePrices(prices);
     }
 
-    // Rate limiting between routes
     if (i < activeRoutes.length - 1) {
       await new Promise((r) => setTimeout(r, 5000));
     }
@@ -216,8 +237,6 @@ function writeConfigAtomic(config, options = {}) {
   writeFlightbotConfigAtomic(DATA_DIR, config, options);
 }
 
-// --- Express server ---
-
 const app = express();
 const PORT = process.env.PORT ?? 3000;
 
@@ -239,8 +258,6 @@ registerApiRoutes({
 app.listen(PORT, () => {
   log(`UI server running on http://localhost:${PORT}`);
 });
-
-// --- Entry point ---
 
 const config = loadConfig();
 

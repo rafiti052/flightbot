@@ -4,24 +4,11 @@ services:
     container_name: flightbot
     restart: unless-stopped
     init: true
+    env_file:
+      - docker.env
     ports:
       - "${PORT:-3000}:3000"
     environment:
-      FLIGHTBOT_DATA_DIR: /data
+      FLIGHTBOT_DATA_DIR: ${FLIGHTBOT_DATA_DIR:-/data}
     volumes:
-      - ./:/data
-
-  web:
-    image: node:20-bookworm-slim
-    container_name: flightbot-web
-    working_dir: /repo
-    command: bash -lc "npm ci && npm run dev -w @flightbot/web"
-    ports:
-      - "${WEB_PORT:-3001}:3001"
-    environment:
-      FLIGHTBOT_DATA_DIR: /repo
-      FLIGHTBOT_BOT_URL: http://flightbot:3000
-    volumes:
-      - ./:/repo
-    depends_on:
-      - flightbot
+      - ${FLIGHTBOT_HOST_DATA_DIR:-./.flightbot/docker}:${FLIGHTBOT_DATA_DIR:-/data}

@@ -15,17 +15,28 @@ A Node.js bot that monitors Google Flights for price drops and sends Telegram al
 ## Installation
 
 ```bash
-npm install
-npm run install-browsers
+pnpm install
+pnpm run install-browsers
 ```
 
 ---
 
 ## Configuration
 
-The bot prefers **`config.yml`** at the project root (shared with the optional Next.js UI). On first startup, if only **`config.json`** exists, it is migrated once to `config.yml`.
+The bot prefers **`config.yml`** in **`FLIGHTBOT_DATA_DIR`** (shared with the optional Next.js UI). On first startup, if only **`config.json`** exists there, it is migrated once to `config.yml`.
 
-Set **`FLIGHTBOT_DATA_DIR`** to the directory that contains `config.yml`, `prices.json`, and `results.log` (defaults to the directory that contains `bot.js`).
+Set **`FLIGHTBOT_DATA_DIR`** to the directory that contains the bot's runtime state. During this refactor, the local-dev default remains the repo root when `FLIGHTBOT_DATA_DIR` is unset, but explicit configuration is recommended for any persistent or shared environment.
+
+### Runtime state in `FLIGHTBOT_DATA_DIR`
+
+The bot reads and writes its runtime state from `FLIGHTBOT_DATA_DIR`:
+
+- `config.yml` - main config (preferred). If only legacy `config.json` exists there, startup migrates it once.
+- `prices.json` - persisted alert history per route.
+- `results.log` - append-only log for human-readable lines and JSON alert records.
+- `.flightbot/last-run.json` - last-run status snapshot used by the dashboard.
+
+Current local-dev decision during this refactor: if `FLIGHTBOT_DATA_DIR` is not set, the bot falls back to the repo root as a temporary data directory. That keeps existing local workflows working while runtime ownership moves fully under `apps/bot`.
 
 ### Log rotation and retention
 
@@ -37,21 +48,21 @@ Set **`FLIGHTBOT_DATA_DIR`** to the directory that contains `config.yml`, `price
 ### Next.js dashboard (primary UI)
 
 ```bash
-npm run dashboard:dev
+pnpm run dashboard:dev
 ```
 
 Opens the dashboard on port **3001** (implemented in `apps/web`). It reads the same data directory and polls `.flightbot/last-run.json` after each bot run. For config saves proxied through the dashboard, set **`FLIGHTBOT_BOT_URL`** to the bot admin URL (e.g. `http://localhost:3000`).
 
 #### UI + bot architecture
 
-- `bot.js` is the runtime composition entrypoint (startup wiring, scheduling, Express route registration).
-- `packages/runtime/core.js` contains shared runtime domain helpers (dates, URL/message formatting, alert evaluation, status read-model shaping).
-- `packages/runtime/worker.js` contains worker-owned foundations (price store + results log adapter).
-- `packages/runtime/orchestration.js` contains worker run orchestration (startup run lock, stale lock handling, cron registration/re-registration).
-- `packages/runtime/api.js` contains API-owned foundations (admin auth, config merge policy, config write rate limiting).
+- `apps/bot/bot.js` is the runtime composition entrypoint (startup wiring, scheduling, Express route registration).
+- `apps/bot/runtime/core.js` contains shared runtime domain helpers (dates, URL/message formatting, alert evaluation, status read-model shaping).
+- `apps/bot/runtime/worker.js` contains worker-owned foundations (price store + results log adapter).
+- `apps/bot/runtime/orchestration.js` contains worker run orchestration (startup run lock, stale lock handling, cron registration/re-registration).
+- `apps/bot/runtime/api.js` contains API-owned foundations (admin auth, config merge policy, config write rate limiting).
 - `apps/web` is the authenticated configuration dashboard (structured schedule UI + advanced JSON editor).
 - Legacy embedded HTML UI has been removed from the bot runtime to keep API responsibilities focused.
-- `results.log` is owned by the worker logging pipeline (rotation/retention controlled via `FLIGHTBOT_LOG_MAX_BYTES` and `FLIGHTBOT_LOG_RETAIN_FILES`).
+- Runtime logs and state live in `FLIGHTBOT_DATA_DIR`; `results.log` is owned by the worker logging pipeline (rotation/retention controlled via `FLIGHTBOT_LOG_MAX_BYTES` and `FLIGHTBOT_LOG_RETAIN_FILES`).
 - Optional helper: set `FLIGHTBOT_WEB_URL` so bot root (`/`) can point to your deployed dashboard URL.
 
 #### Vercel environment notes
@@ -62,13 +73,13 @@ The Vercel project name is `flightbot`, and the deployed dashboard source lives 
 
 - Keep the Vercel project **Root Directory** set to `apps/web` in project settings.
 - Manual deploy shortcuts from repo root:
-  - `npm run vercel:preview`
-  - `npm run vercel:prod`
+  - `pnpm run vercel:preview`
+  - `pnpm run vercel:prod`
 - The deploy scripts force `--cwd apps/web` so CLI deploys stay aligned with the dashboard source.
 
 ### Docker
 
-`docker compose up` starts **flightbot** (port 3000) and **flightbot-web** (port 3001) with `./` mounted as the shared data directory.
+`docker compose up` starts the **flightbot** bot service (port 3000). The bot reads runtime state from `FLIGHTBOT_DATA_DIR` inside the container, with the host directory supplied by `FLIGHTBOT_HOST_DATA_DIR`.
 
 ---
 
@@ -117,7 +128,7 @@ Uses standard cron syntax. Default `"0 7,13,20 * * *"` runs at 7:00, 13:00, and 
 ## Running
 
 ```bash
-node bot.js
+FLIGHTBOT_DATA_DIR="$PWD" node apps/bot/bot.js
 ```
 
 The bot runs once immediately on startup, then follows the cron schedule.
@@ -129,8 +140,8 @@ The bot runs once immediately on startup, then follows the cron schedule.
 GitHub Actions runs the dashboard test suite with unit tests gating e2e execution:
 
 ```bash
-npm run test:unit -w @flightbot/web
-npm run e2e -w @flightbot/web
+pnpm --filter @flightbot/web test:unit
+pnpm --filter @flightbot/web e2e
 ```
 
 ---
@@ -139,7 +150,7 @@ npm run e2e -w @flightbot/web
 
 ```bash
 npm install -g pm2
-pm2 start bot.js --name flight-bot
+FLIGHTBOT_DATA_DIR=/opt/flightbot/data pm2 start apps/bot/bot.js --name flight-bot --update-env
 pm2 save && pm2 startup
 ```
 
@@ -150,7 +161,7 @@ pm2 save && pm2 startup
 To force the bot to re-alert even if prices haven't improved (e.g. after changing routes):
 
 ```bash
-rm prices.json
+rm "$FLIGHTBOT_DATA_DIR/prices.json"
 ```
 
 ---
@@ -158,7 +169,7 @@ rm prices.json
 ## Viewing logs
 
 ```bash
-tail -f results.log
+tail -f "$FLIGHTBOT_DATA_DIR/results.log"
 ```
 
 Logs include both human-readable lines and structured JSON records for each alert fired.
