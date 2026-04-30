@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getSessionOr401Response } from "@/lib/requireSession";
 
 export const dynamic = "force-dynamic";
 
@@ -15,16 +16,18 @@ function botToken() {
 }
 
 export async function GET() {
+  const auth = await getSessionOr401Response();
+  if (!auth.ok) return auth.response;
+
   try {
     const upstream = await fetch(`${botBaseUrl()}/status`, {
       cache: "no-store",
       headers: { Authorization: `Bearer ${botToken()}` },
-      signal: AbortSignal.timeout(10000),
     });
     const text = await upstream.text();
     if (!upstream.ok) {
       return NextResponse.json(
-        { error: `Upstream status failed (${upstream.status}): ${text.slice(0, 300)}` },
+        { error: `Upstream status failed (${upstream.status})` },
         { status: 502 },
       );
     }
@@ -38,7 +41,6 @@ export async function GET() {
     return NextResponse.json({ runId, status: schedule.lastRunStatus ?? null });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error("[last-run] upstream fetch failed", msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
