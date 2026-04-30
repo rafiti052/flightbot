@@ -7,7 +7,7 @@ services:
     env_file:
       - docker.env
     ports:
-      - "${FLIGHTBOT_HOST_PORT:-3000}:3000"
+      - "${PORT:-3000}:3000"
     environment:
       FLIGHTBOT_DATA_DIR: ${FLIGHTBOT_DATA_DIR:-/data}
     volumes:

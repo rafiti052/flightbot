@@ -39,6 +39,6 @@ export async function GET() {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[last-run] upstream fetch failed", msg);
-    return NextResponse.json({ runId: null, status: null, error: msg, unreachable: true });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
