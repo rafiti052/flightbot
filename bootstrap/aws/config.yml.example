@@ -22,7 +22,7 @@ routes:
     currency: BRL
     maxStops: 1
     maxBudget: 1200
-    maxDurationHours: 2
+    maxDurationHours: 5
     active: true
   - name: "FLN → SDU"
     from: FLN
@@ -34,7 +34,7 @@ routes:
     currency: BRL
     maxStops: 1
     maxBudget: 1200
-    maxDurationHours: 2
+    maxDurationHours: 5
     active: true
 
 _configMeta:
