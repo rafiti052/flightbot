@@ -21,7 +21,7 @@ routes:
     flexDays: 0
     currency: BRL
     maxStops: 1
-    maxBudget: 1200
+    maxBudget: 1500
     maxDurationHours: 5
     active: true
   - name: "FLN → SDU"
@@ -33,7 +33,7 @@ routes:
     flexDays: 0
     currency: BRL
     maxStops: 1
-    maxBudget: 1200
+    maxBudget: 1500
     maxDurationHours: 5
     active: true
 
