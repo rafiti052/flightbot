@@ -1,6 +1,16 @@
+# bot configs and logs
 config.json
 prices.json
 results.log
+
+# scrapping screenshots
 *.png
+
+# node_modules
 node_modules/
-.claude/settings.local.json
+
+# environment variables
+.env
+
+# agentic config and development assistant files
+.claude/

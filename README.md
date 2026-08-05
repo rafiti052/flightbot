@@ -23,12 +23,28 @@ npm run install-browsers
 
 ## Configuration
 
-Edit `config.json` before running:
+### Secrets
+
+Copy `.env.example` to `.env` and fill in your keys:
+
+```bash
+cp .env.example .env
+```
+
+```
+ANTHROPIC_KEY=your_anthropic_api_key_here
+TELEGRAM_KEY=your_telegram_bot_api_key_here
+```
+
+`.env` is gitignored and loaded automatically on startup — never put real keys in `config.json`.
+
+### `config.json`
+
+Edit `config.json` for everything else:
 
 ```json
 {
   "telegram": {
-    "token": "YOUR_BOT_TOKEN_HERE",
     "chatId": "YOUR_CHAT_ID_HERE"
   },
   "schedule": "0 7,13,20 * * *",
@@ -38,8 +54,8 @@ Edit `config.json` before running:
 
 ### Getting your Telegram credentials
 
-1. **Bot token**: Message [@BotFather](https://t.me/BotFather) on Telegram → `/newbot` → follow the prompts → copy the token
-2. **Chat ID**: Message [@userinfobot](https://t.me/userinfobot) on Telegram → it will reply with your chat ID
+1. **Bot token**: Message [@BotFather](https://t.me/BotFather) on Telegram → `/newbot` → follow the prompts → copy the token into `.env` as `TELEGRAM_KEY`
+2. **Chat ID**: Message [@userinfobot](https://t.me/userinfobot) on Telegram → it will reply with your chat ID → put it in `config.json` as `telegram.chatId`
 
 ### Route fields
 

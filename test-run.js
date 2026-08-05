@@ -10,7 +10,18 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+try {
+  process.loadEnvFile(path.join(__dirname, ".env"));
+} catch {
+  // No .env file present — fall back to env vars injected by the environment.
+}
+
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf-8"));
+if (!process.env.ANTHROPIC_KEY) throw new Error("ANTHROPIC_KEY is not set (check .env)");
+if (!process.env.TELEGRAM_KEY) throw new Error("TELEGRAM_KEY is not set (check .env)");
+config.anthropic = { ...config.anthropic, apiKey: process.env.ANTHROPIC_KEY };
+config.telegram = { ...config.telegram, token: process.env.TELEGRAM_KEY };
 
 const routeArg = process.argv[2];
 const route = routeArg

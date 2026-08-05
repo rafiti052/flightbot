@@ -17,9 +17,9 @@ Interpret the intent:
    - Remove the route's key from prices.json
    - Write the updated prices.json
    - Confirm: "Price history cleared for [route]. Next scrape will treat it as fresh and alert if price ≤ maxBudget."
-   - Offer to sync prices.json to EC2 immediately (volume-mounted — no container restart needed):
+   - Offer to sync prices.json to EC2 immediately (volume-mounted — no container restart needed). Connection details (`SSH_KEY_PATH`, `SSH_USER`, `SSH_HOST`) come from `.env`; source it first since each command runs in a fresh shell:
      ```
-     rsync -avz -e 'ssh -o StrictHostKeyChecking=no -i "/Users/rafael/Desktop/Documentos/poc-dev-key.pem"' /Users/rafael/Dev/flightbot/prices.json ec2-user@ec2-54-91-170-193.compute-1.amazonaws.com:/home/ec2-user/flightbot/prices.json
+     source /Users/rafael/Dev/flightbot/.env && rsync -avz -e "ssh -o StrictHostKeyChecking=no -i \"$SSH_KEY_PATH\"" /Users/rafael/Dev/flightbot/prices.json "$SSH_USER@$SSH_HOST:/home/ec2-user/flightbot/prices.json"
      ```
 
 3. **If pausing a route:**
@@ -32,6 +32,6 @@ Interpret the intent:
 
 5. For config.json changes, offer to push and restart:
    ```
-   rsync -avz -e 'ssh -o StrictHostKeyChecking=no -i "/Users/rafael/Desktop/Documentos/poc-dev-key.pem"' /Users/rafael/Dev/flightbot/config.json ec2-user@ec2-54-91-170-193.compute-1.amazonaws.com:/home/ec2-user/flightbot/config.json
-   ssh -i "/Users/rafael/Desktop/Documentos/poc-dev-key.pem" -o StrictHostKeyChecking=no ec2-user@ec2-54-91-170-193.compute-1.amazonaws.com "cd /home/ec2-user/flightbot && docker-compose restart"
+   source /Users/rafael/Dev/flightbot/.env && rsync -avz -e "ssh -o StrictHostKeyChecking=no -i \"$SSH_KEY_PATH\"" /Users/rafael/Dev/flightbot/config.json "$SSH_USER@$SSH_HOST:/home/ec2-user/flightbot/config.json"
+   source /Users/rafael/Dev/flightbot/.env && ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "$SSH_USER@$SSH_HOST" "cd /home/ec2-user/flightbot && docker-compose restart"
    ```

@@ -42,11 +42,11 @@ Steps:
 
 5. After confirmation, append the route to the `routes` array in `config.json` and write the file. Print the updated routes list.
 
-6. Remind the user: `config.json` is not synced by `/deploy` (to protect live state). To push this new route to EC2, run:
+6. Remind the user: `config.json` is not synced by `/deploy` (to protect live state). To push this new route to EC2, run (connection details come from `.env`; source it first since each command runs in a fresh shell):
    ```
-   rsync -avz -e 'ssh -o StrictHostKeyChecking=no -i "/Users/rafael/Desktop/Documentos/poc-dev-key.pem"' /Users/rafael/Dev/flightbot/config.json ec2-user@ec2-54-91-170-193.compute-1.amazonaws.com:/home/ec2-user/flightbot/config.json
+   source /Users/rafael/Dev/flightbot/.env && rsync -avz -e "ssh -o StrictHostKeyChecking=no -i \"$SSH_KEY_PATH\"" /Users/rafael/Dev/flightbot/config.json "$SSH_USER@$SSH_HOST:/home/ec2-user/flightbot/config.json"
    ```
    Then restart the container so the bot picks up the new config:
    ```
-   ssh -i "/Users/rafael/Desktop/Documentos/poc-dev-key.pem" -o StrictHostKeyChecking=no ec2-user@ec2-54-91-170-193.compute-1.amazonaws.com "cd /home/ec2-user/flightbot && docker-compose restart"
+   source /Users/rafael/Dev/flightbot/.env && ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "$SSH_USER@$SSH_HOST" "cd /home/ec2-user/flightbot && docker-compose restart"
    ```

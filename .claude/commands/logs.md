@@ -24,8 +24,8 @@ Analyze the flightbot results log. Argument: $ARGUMENTS (empty = local only; "re
 
 **If $ARGUMENTS contains "remote":**
 
-Additionally SSH and tail the remote log:
+Additionally SSH and tail the remote log. Connection details (`SSH_KEY_PATH`, `SSH_USER`, `SSH_HOST`) come from `.env`; source it first since each command runs in a fresh shell:
 ```
-ssh -i "/Users/rafael/Desktop/Documentos/poc-dev-key.pem" -o StrictHostKeyChecking=no ec2-user@ec2-54-91-170-193.compute-1.amazonaws.com "tail -60 /home/ec2-user/flightbot/results.log"
+source /Users/rafael/Dev/flightbot/.env && ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "$SSH_USER@$SSH_HOST" "tail -60 /home/ec2-user/flightbot/results.log"
 ```
 Then apply the same structured analysis to the remote output and show if it differs from the local log.

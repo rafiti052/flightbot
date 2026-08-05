@@ -6,9 +6,16 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ENV_PATH = path.join(__dirname, ".env");
 const CONFIG_PATH = path.join(__dirname, "config.json");
 const PRICES_PATH = path.join(__dirname, "prices.json");
 const LOG_PATH = path.join(__dirname, "results.log");
+
+try {
+  process.loadEnvFile(ENV_PATH);
+} catch {
+  // No .env file present — fall back to env vars injected by the environment (e.g. Docker).
+}
 const ANTHROPIC_TIMEOUT_MS = 120_000;
 const ANTHROPIC_MAX_RETRIES = 1;
 const SCRAPE_TIMEOUT_MS = 180_000;
@@ -27,11 +34,22 @@ function loadConfig() {
   } catch (e) {
     throw new Error(`Failed to read config.json: ${e.message}`);
   }
+  let config;
   try {
-    return JSON.parse(raw);
+    config = JSON.parse(raw);
   } catch (e) {
     throw new Error(`config.json is malformed JSON: ${e.message}`);
   }
+
+  const anthropicKey = process.env.ANTHROPIC_KEY;
+  const telegramKey = process.env.TELEGRAM_KEY;
+  if (!anthropicKey) throw new Error("ANTHROPIC_KEY is not set (check .env)");
+  if (!telegramKey) throw new Error("TELEGRAM_KEY is not set (check .env)");
+
+  config.anthropic = { ...config.anthropic, apiKey: anthropicKey };
+  config.telegram = { ...config.telegram, token: telegramKey };
+
+  return config;
 }
 
 function loadPrices() {

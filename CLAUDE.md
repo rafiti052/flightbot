@@ -5,13 +5,14 @@ Node.js bot that scrapes Google Flights via Playwright, uses Claude vision (Haik
 ## Architecture
 
 - **`bot.js`** — entire bot in a single file (entry point, scraping, AI extraction, alerting)
-- **`config.json`** — runtime config (API keys, routes, schedule). Never commit real keys.
+- **`.env`** — secrets (`ANTHROPIC_KEY`, `TELEGRAM_KEY`). Gitignored, never commit real keys. See `.env.example`.
+- **`config.json`** — runtime config (routes, schedule, chat ID). No secrets live here anymore.
 - **`prices.json`** — persisted price state per route. Delete to reset alert history.
 - **`results.log`** — append-only log of human-readable lines + JSON alert records
 
 ## Key flow
 
-1. `loadConfig()` reads `config.json` on startup
+1. `loadConfig()` loads `.env` (via `process.loadEnvFile`), reads `config.json`, and injects `ANTHROPIC_KEY`/`TELEGRAM_KEY` from the environment into `config.anthropic.apiKey` / `config.telegram.token`
 2. `run(config)` executes immediately and then on cron schedule
 3. For each active route, `dateVariants()` expands `flexDays` into multiple departure offsets
 4. `scrapeFlights()` launches headless Chromium, navigates Google Flights, takes a full-page screenshot
@@ -28,12 +29,18 @@ Node.js bot that scrapes Google Flights via Playwright, uses Claude vision (Haik
   - `returned` — price is still under budget but higher than last alert (came back up then dropped again)
   - Silent if price is above budget
 
-## Config fields
+## Secrets (`.env`)
+
+| Var | Notes |
+|-----|-------|
+| `ANTHROPIC_KEY` | Anthropic API key for Claude vision |
+| `TELEGRAM_KEY` | Telegram Bot API token |
+
+## Config fields (`config.json`)
 
 | Field | Notes |
 |-------|-------|
-| `anthropic.apiKey` | Anthropic API key for Claude vision |
-| `telegram.token` / `chatId` | Telegram Bot API credentials |
+| `telegram.chatId` | Telegram chat ID (token lives in `.env` as `TELEGRAM_KEY`) |
 | `schedule` | Standard cron syntax |
 | `routes[].flexDays` | Expands departure date ±N days; each variant is scraped separately |
 | `routes[].maxBudget` | If set, enables budget-aware alerting; if null, alerts on any new low |
