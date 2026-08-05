@@ -1,26 +1,36 @@
 Run a full smoke test of the flightbot scraping pipeline for route: $ARGUMENTS
 
+Choose local or production:
+
+```
+node /Users/rafael/Dev/flightbot/scripts/test-scrape.js "$ARGUMENTS"      # local checkout
+/Users/rafael/Dev/flightbot/scripts/remote-test.sh "$ARGUMENTS"           # deployed container
+```
+
+Default to the local run unless the user says "prod", "production", or "remote". Empty `$ARGUMENTS` tests the first active route; a route name (e.g. `"GRU → FLN"`) tests that one. Quote the name — route names contain `→`.
+
+The script scrapes Google Flights, switches to the **Cheapest** tab, expands the result list, flattens sticky elements, sends the screenshot to Claude Haiku, applies filters, and sends a `[TEST]` Telegram message.
+
 Steps:
 
-1. Run the smoke test:
-   ```
-   node /Users/rafael/Dev/flightbot/test-run.js "$ARGUMENTS"
-   ```
-   If $ARGUMENTS is empty, it tests the first active route. If a route name is provided (e.g. "GRU → LIS"), it tests that specific route. The script will scrape Google Flights via Playwright, send the screenshot to Claude Haiku for extraction, apply filters, and send a [TEST] Telegram message.
+1. Run the appropriate command.
+2. For a local run, display `/Users/rafael/Dev/flightbot/test-screenshot.png` visually so the page render can be inspected. (The remote run may not persist a screenshot — rely on log output there.)
+3. Report:
+   - URL fetched (confirm it contains `nonstop` when the route sets `maxStops: 0`)
+   - Whether `Sorted by cheapest` appears — if not, the Cheapest tab selector needs attention
+   - Raw flights extracted (count)
+   - Flights passing filters (count + the filter values used)
+   - Best flight: airline, price, stops, times
+   - Whether the Telegram message sent
 
-2. Display the screenshot at `/Users/rafael/Dev/flightbot/test-screenshot.png` visually so the page render can be inspected.
+4. If 0 flights were extracted:
+   - Show the raw Claude response between the `--- Claude raw response ---` markers
+   - Inspect the screenshot: real results page, CAPTCHA, cookie wall, or empty?
+   - Page looks right but extraction failed → the prompt in `scraper.js` → `extractFlightsFromScreenshot()` needs adjustment
+   - Truncated JSON → raise `max_tokens` in `scraper.js`
+   - CAPTCHA or empty results → bot detection; suggest retrying later or revisiting the User-Agent / locale
+   - Departure dates in the past also produce empty pages — check the route dates against today
 
-3. Parse the console output and report:
-   - URL that was fetched
-   - Raw flights extracted by Claude (count)
-   - Flights that passed filters (count + filter values used)
-   - Best flight found: airline, price, stops, departure/arrival times
-   - Whether the Telegram message was sent successfully
+5. Finish with a one-line verdict.
 
-4. If 0 flights were extracted by Claude:
-   - Show the raw Claude response from stdout (between the "--- Claude raw response ---" markers)
-   - Visually inspect the screenshot: does it show a Google Flights results page with flight cards, a CAPTCHA, a cookie wall, or something else?
-   - If the page looks correct but extraction failed, the prompt in `bot.js` → `extractFlightsFromScreenshot()` may need adjustment
-   - If the page shows a CAPTCHA or empty results, the scraper hit bot detection — suggest waiting and retrying, or checking the User-Agent/locale settings
-
-5. Finish with a one-line verdict: "Scraper OK — extracted N flights, best price X BRL, Telegram sent." or a clear failure summary.
+Important: the script exits non-zero when no flight passes the filters, but that is **not** necessarily a scraper failure — if flights were extracted and simply exceeded `maxBudget` or the duration cap, the pipeline worked correctly. Say so explicitly, and report the cheapest flight seen for comparison against the budget.

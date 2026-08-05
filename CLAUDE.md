@@ -4,19 +4,21 @@ Node.js bot that scrapes Google Flights via Playwright, uses Claude vision (Haik
 
 ## Architecture
 
-- **`bot.js`** — entire bot in a single file (entry point, scraping, AI extraction, alerting)
-- **`.env`** — secrets (`ANTHROPIC_KEY`, `TELEGRAM_KEY`). Gitignored, never commit real keys. See `.env.example`.
-- **`config.json`** — runtime config (routes, schedule, chat ID). No secrets live here anymore.
+- **`bot.js`** — entry point: config loading, cron scheduling, alert evaluation, Telegram delivery, logging
+- **`scraper.js`** — shared scrape path: URL building, Playwright page prep/capture, Claude vision extraction, filtering. Imported by both `bot.js` and `scripts/test-scrape.js` so the smoke test exercises the same code production runs.
+- **`.env`** — secrets and account identifiers (`ANTHROPIC_KEY`, `TELEGRAM_KEY`, `TELEGRAM_CHAT_ID`) plus deploy SSH vars (`SSH_KEY_PATH`, `SSH_USER`, `SSH_HOST`). Gitignored, never commit real keys. See `.env.example`.
+- **`config.json`** — runtime config (routes, schedule) only. No secrets or account IDs.
+- **`scripts/`** — deterministic shell/node scripts backing the `.claude/commands/*.md` slash commands.
 - **`prices.json`** — persisted price state per route. Delete to reset alert history.
 - **`results.log`** — append-only log of human-readable lines + JSON alert records
 
 ## Key flow
 
-1. `loadConfig()` loads `.env` (via `process.loadEnvFile`), reads `config.json`, and injects `ANTHROPIC_KEY`/`TELEGRAM_KEY` from the environment into `config.anthropic.apiKey` / `config.telegram.token`
+1. `loadConfig()` loads `.env` (via `process.loadEnvFile`), reads `config.json`, and injects `ANTHROPIC_KEY`/`TELEGRAM_KEY`/`TELEGRAM_CHAT_ID` into `config.anthropic.apiKey` / `config.telegram.token` / `config.telegram.chatId`. It throws if any of the three is missing.
 2. `run(config)` executes immediately and then on cron schedule
 3. For each active route, `dateVariants()` expands `flexDays` into multiple departure offsets
-4. `scrapeFlights()` launches headless Chromium, navigates Google Flights, takes a full-page screenshot
-5. `extractFlightsFromScreenshot()` sends the screenshot to `claude-haiku-4-5-20251001` via the Anthropic SDK and parses the JSON response
+4. `captureFlightsScreenshot()` (scraper.js) launches headless Chromium, navigates Google Flights, switches to the **Cheapest** tab, expands "View more flights", flattens sticky/fixed elements, and takes a full-page screenshot
+5. `extractFlightsFromScreenshot()` sends the screenshot to `claude-haiku-4-5-20251001` via the Anthropic SDK and returns `{ flights, rawText, parseError }`
 6. `evaluateAlert()` compares best price against `maxBudget` and previous alert state
 7. `sendTelegram()` fires a Markdown message via the Bot API
 
@@ -35,12 +37,13 @@ Node.js bot that scrapes Google Flights via Playwright, uses Claude vision (Haik
 |-----|-------|
 | `ANTHROPIC_KEY` | Anthropic API key for Claude vision |
 | `TELEGRAM_KEY` | Telegram Bot API token |
+| `TELEGRAM_CHAT_ID` | Telegram chat ID to send alerts to |
+| `SSH_KEY_PATH` / `SSH_USER` / `SSH_HOST` | EC2 deploy target, used by `scripts/lib/common.sh` |
 
 ## Config fields (`config.json`)
 
 | Field | Notes |
 |-------|-------|
-| `telegram.chatId` | Telegram chat ID (token lives in `.env` as `TELEGRAM_KEY`) |
 | `schedule` | Standard cron syntax |
 | `routes[].flexDays` | Expands departure date ±N days; each variant is scraped separately |
 | `routes[].maxBudget` | If set, enables budget-aware alerting; if null, alerts on any new low |
@@ -50,7 +53,7 @@ Node.js bot that scrapes Google Flights via Playwright, uses Claude vision (Haik
 ## Running
 
 ```bash
-npm install && npm run install-browsers
+pnpm install && pnpm run install-browsers
 node bot.js
 ```
 
@@ -69,6 +72,9 @@ docker-compose up -d
 ## Notes
 
 - Rate limiting: 3–6s random delay between date variants; 5s between routes
-- Filters (`maxStops`, `maxDurationHours`) are applied after Claude extraction, not at scrape time
+- Filters (`maxStops`, `maxDurationHours`) are applied after Claude extraction, not at scrape time. When `maxStops` is `0`, `buildUrl()` also appends `nonstop` to the query as a *hint* to narrow what Google renders — the post-extraction filter remains authoritative.
+- Google Flights defaults to "Best" ranking, which can leave the cheapest itinerary entirely unrendered. `sortByCheapest()` clicks the Cheapest tab; it is non-fatal and falls back to default sort if the tab is missing.
+- Sticky/fixed elements are flattened to `position: static` before capture — otherwise Playwright's stitched full-page screenshot paints the Google header over a flight row.
+- `scraper.js` takes an injected `log` function (defaults to `console.log`); `bot.js` passes its own route-prefixed logger that appends to `results.log`.
 - `prices.json` uses route `name` as key — changing a route name resets its alert history
 - The bot uses `claude-haiku-4-5-20251001` for cost efficiency on vision tasks

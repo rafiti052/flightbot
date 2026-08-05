@@ -1,37 +1,33 @@
 Reset or pause a flightbot route based on: $ARGUMENTS
 
-Interpret the intent:
-- "reset [name]" or "clear [name]" → clear that route's price history from prices.json (next scrape treats it as fresh)
-- "pause [name]" or "disable [name]" → set active: false in config.json
-- "resume [name]" or "enable [name]" → set active: true in config.json
-- empty or "all" → show current state of all routes and ask what to do
+Interpret the intent, then delegate the mutation to `scripts/config-route.js`:
+
+| Intent | Command |
+|--------|---------|
+| "reset X" / "clear X" | `node scripts/config-route.js reset "X"` — clears price history so the next scrape treats it as fresh |
+| "pause X" / "disable X" | `node scripts/config-route.js pause "X"` |
+| "resume X" / "enable X" | `node scripts/config-route.js resume "X"` |
+| empty / "all" | `node scripts/config-route.js list`, show the table, then ask what to do |
+
+All paths are relative to `/Users/rafael/Dev/flightbot`.
 
 **Steps:**
 
-1. Read `/Users/rafael/Dev/flightbot/prices.json` and `/Users/rafael/Dev/flightbot/config.json`. Print a table:
+1. Always start with `list` and print a table:
 
-   | Route | Active | maxBudget | lastAlertPrice | lastAlertAt | lastSeenPrice | lastSeenAt |
-   |-------|--------|-----------|----------------|-------------|---------------|------------|
+   | Route | Active | maxBudget | Depart | Return | lastSeenPrice | lastAlertPrice |
+   |-------|--------|-----------|--------|--------|---------------|----------------|
 
-2. **If resetting price history:**
-   - Remove the route's key from prices.json
-   - Write the updated prices.json
-   - Confirm: "Price history cleared for [route]. Next scrape will treat it as fresh and alert if price ≤ maxBudget."
-   - Offer to sync prices.json to EC2 immediately (volume-mounted — no container restart needed). Connection details (`SSH_KEY_PATH`, `SSH_USER`, `SSH_HOST`) come from `.env`; source it first since each command runs in a fresh shell:
-     ```
-     source /Users/rafael/Dev/flightbot/.env && rsync -avz -e "ssh -o StrictHostKeyChecking=no -i \"$SSH_KEY_PATH\"" /Users/rafael/Dev/flightbot/prices.json "$SSH_USER@$SSH_HOST:/home/ec2-user/flightbot/prices.json"
-     ```
+2. Run the matching command. Route names contain a `→`, so always quote them. The script validates the name against `config.json` and lists valid names if it doesn't match — surface that message rather than guessing.
 
-3. **If pausing a route:**
-   - Set `active: false` on the matching route in config.json and write the file
-   - Remind the user: config.json changes require a container restart on EC2 to take effect
+3. Report what changed, using the script's JSON output:
+   - **reset** — confirm history cleared and note that the next scrape will alert if price ≤ `maxBudget`. `prices.json` is bind-mounted, so no container restart is needed; the file just needs to reach the server.
+   - **pause / resume** — note that `config.json` changes require a container restart on EC2 to take effect.
 
-4. **If resuming a route:**
-   - Set `active: true` on the matching route in config.json and write the file
-   - Same reminder about container restart
+4. Offer to push the changed file to production and, for `config.json` changes, restart:
 
-5. For config.json changes, offer to push and restart:
    ```
-   source /Users/rafael/Dev/flightbot/.env && rsync -avz -e "ssh -o StrictHostKeyChecking=no -i \"$SSH_KEY_PATH\"" /Users/rafael/Dev/flightbot/config.json "$SSH_USER@$SSH_HOST:/home/ec2-user/flightbot/config.json"
-   source /Users/rafael/Dev/flightbot/.env && ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "$SSH_USER@$SSH_HOST" "cd /home/ec2-user/flightbot && docker-compose restart"
+   /Users/rafael/Dev/flightbot/scripts/deploy.sh
    ```
+
+   Note `deploy.sh` deliberately does **not** sync `config.json` or `prices.json` — copy those explicitly when the user wants them applied in production.

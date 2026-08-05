@@ -1,9 +1,13 @@
-import { chromium } from "playwright";
-import Anthropic from "@anthropic-ai/sdk";
 import cron from "node-cron";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import {
+  buildUrl,
+  captureFlightsScreenshot,
+  extractFlightsFromScreenshot,
+  filterFlights,
+} from "./scraper.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ENV_PATH = path.join(__dirname, ".env");
@@ -16,10 +20,6 @@ try {
 } catch {
   // No .env file present — fall back to env vars injected by the environment (e.g. Docker).
 }
-const ANTHROPIC_TIMEOUT_MS = 120_000;
-const ANTHROPIC_MAX_RETRIES = 1;
-const SCRAPE_TIMEOUT_MS = 180_000;
-const MAX_SCROLL_STEPS = 20;
 const RUN_LOCK_STALE_MS = 6 * 60 * 60 * 1000;
 
 // --- Config loading ---
@@ -43,11 +43,13 @@ function loadConfig() {
 
   const anthropicKey = process.env.ANTHROPIC_KEY;
   const telegramKey = process.env.TELEGRAM_KEY;
+  const telegramChatId = process.env.TELEGRAM_CHAT_ID;
   if (!anthropicKey) throw new Error("ANTHROPIC_KEY is not set (check .env)");
   if (!telegramKey) throw new Error("TELEGRAM_KEY is not set (check .env)");
+  if (!telegramChatId) throw new Error("TELEGRAM_CHAT_ID is not set (check .env)");
 
   config.anthropic = { ...config.anthropic, apiKey: anthropicKey };
-  config.telegram = { ...config.telegram, token: telegramKey };
+  config.telegram = { ...config.telegram, token: telegramKey, chatId: telegramChatId };
 
   return config;
 }
@@ -107,20 +109,6 @@ function formatError(err) {
   return String(err);
 }
 
-async function withTimeout(promise, ms, label) {
-  let timer;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
-      }),
-    ]);
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 // --- Date helpers ---
 
 function shiftDate(dateStr, days) {
@@ -145,181 +133,29 @@ function dateVariants(route) {
   return variants;
 }
 
-// --- URL building ---
-
-function buildUrl(route) {
-  const depStr = route.departureDate;
-  if (!depStr) throw new Error(`Route "${route.name}" is missing "departureDate"`);
-
-  let query;
-  if (route.roundTrip) {
-    const retStr = route.returnDate;
-    if (!retStr) throw new Error(`Route "${route.name}" is missing "returnDate" for a round trip`);
-    query = `Round-trip ${route.from} to ${route.to} ${depStr} return ${retStr}`;
-  } else {
-    query = `One-way ${route.from} to ${route.to} ${depStr}`;
-  }
-
-  const currency = route.currency ?? "USD";
-  return `https://www.google.com/travel/flights/search?q=${encodeURIComponent(query)}&curr=${currency}&hl=en`;
-}
-
-// --- Popup dismissal ---
-
-async function dismissPopups(page) {
-  const selectors = [
-    'button[aria-label="Accept all"]',
-    'button[aria-label="Reject all"]',
-    '[jsname="b3VHJd"]',
-    '.tHlp8d button',
-  ];
-  for (const sel of selectors) {
-    try {
-      const el = await page.$(sel);
-      if (el) await el.click();
-    } catch {
-      // ignore
-    }
-  }
-}
-
-// --- Duration parsing ---
-
-function parseDurationHours(durationStr) {
-  if (!durationStr) return null;
-  const hrMatch = durationStr.match(/(\d+)\s*hr/);
-  const minMatch = durationStr.match(/(\d+)\s*min/);
-  const hours = hrMatch ? parseInt(hrMatch[1]) : 0;
-  const minutes = minMatch ? parseInt(minMatch[1]) : 0;
-  return hours + minutes / 60;
-}
-
 // --- Scraping ---
 
-async function extractFlightsFromScreenshot(screenshot, route, apiKey) {
-  const anthropic = new Anthropic({
-    apiKey,
-    timeout: ANTHROPIC_TIMEOUT_MS,
-    maxRetries: ANTHROPIC_MAX_RETRIES,
-  });
-  const currency = route.currency ?? "USD";
-
-  const prompt =
-    `You are extracting flight data from a Google Flights screenshot.\n` +
-    `Return ONLY a valid JSON array of flight objects visible on screen. No explanation, no markdown.\n\n` +
-    `Each object must have exactly these fields:\n` +
-    `- price: number (${currency}, integer, digits only — e.g. 5763)\n` +
-    `- airline: string\n` +
-    `- duration: string (e.g. "14 hr 30 min")\n` +
-    `- stops: number (0 for nonstop, 1 for one stop, etc.)\n` +
-    `- depTime: string (e.g. "9:00 PM")\n` +
-    `- arrTime: string (e.g. "11:45 AM")\n\n` +
-    `If a field is not visible, use null. Skip any row that has no price.`;
-
-  const response = await anthropic.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 1024,
-    messages: [{
-      role: "user",
-      content: [
-        {
-          type: "image",
-          source: { type: "base64", media_type: "image/png", data: screenshot.toString("base64") },
-        },
-        { type: "text", text: prompt },
-      ],
-    }],
-  });
-
-  const text = response.content[0].text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-  try {
-    const parsed = JSON.parse(text);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    log(`Claude extraction failed to parse JSON. Raw: ${text.slice(0, 300)}`);
-    return [];
-  }
-}
-
 async function scrapeFlights(route, apiKey) {
-  const url = buildUrl(route);
-  log(`[${route.name}] Fetching: ${url}`);
+  const screenshot = await captureFlightsScreenshot(route, {
+    log: (msg) => log(`[${route.name}] ${msg}`),
+  });
+  log(`[${route.name}] Screenshot captured, sending to Claude...`);
 
-  const browser = await chromium.launch({
-    headless: true,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-blink-features=AutomationControlled",
-    ],
+  const { flights, rawText, parseError } = await extractFlightsFromScreenshot(screenshot, route, apiKey);
+  if (parseError) {
+    log(`[${route.name}] Claude extraction failed to parse JSON. Raw: ${rawText.slice(0, 300)}`);
+  }
+  log(`[${route.name}] Claude extracted ${flights.length} flight(s)`);
+
+  // maxBudget is intentionally not applied here — evaluateAlert() needs to see
+  // over-budget prices to track lastSeenPrice.
+  const filtered = filterFlights(flights, {
+    maxStops: route.maxStops ?? null,
+    maxDurationHours: route.maxDurationHours ?? null,
   });
 
-  try {
-    return await withTimeout((async () => {
-    const context = await browser.newContext({
-      userAgent:
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-      locale: "en-US",
-      timezoneId: "America/Sao_Paulo",
-      viewport: { width: 1280, height: 1600 },
-      deviceScaleFactor: 2,
-    });
-
-    const page = await context.newPage();
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
-    await dismissPopups(page);
-
-    try {
-      await page.waitForSelector("li[jsname='pbdLld'], li.pIav2d", { timeout: 30000 });
-    } catch {
-      log(`[${route.name}] Timed out waiting for flight cards — continuing`);
-    }
-
-    await page.waitForTimeout(3000);
-
-    // Scroll down slowly to trigger lazy-loading of cheaper flights
-    await page.evaluate(async (maxSteps) => {
-      const step = 600;
-      for (let i = 0; i < maxSteps; i++) {
-        const before = window.scrollY;
-        window.scrollBy(0, step);
-        await new Promise((resolve) => setTimeout(resolve, 300));
-        const after = window.scrollY;
-        const maxScroll = Math.max(
-          document.documentElement.scrollHeight,
-          document.body?.scrollHeight ?? 0,
-        ) - window.innerHeight;
-        if (after === before || after >= maxScroll) break;
-      }
-    }, MAX_SCROLL_STEPS);
-    await page.waitForTimeout(2000);
-
-    const screenshot = await page.screenshot({ fullPage: true });
-    log(`[${route.name}] Screenshot captured, sending to Claude...`);
-
-    const flights = await extractFlightsFromScreenshot(screenshot, route, apiKey);
-    log(`[${route.name}] Claude extracted ${flights.length} flight(s)`);
-
-    // Apply filters
-    const maxStops = route.maxStops ?? null;
-    const maxDurationHours = route.maxDurationHours ?? null;
-
-    const filtered = flights.filter((f) => {
-      if (!f.price || isNaN(f.price) || f.price < 100) return false;
-      if (maxStops !== null && f.stops !== null && f.stops > maxStops) return false;
-      if (maxDurationHours !== null) {
-        const h = parseDurationHours(f.duration);
-        if (h === null || h > maxDurationHours) return false;
-      }
-      return true;
-    });
-
-    filtered.sort((a, b) => a.price - b.price);
-    return filtered.slice(0, 5);
-    })(), SCRAPE_TIMEOUT_MS, `[${route.name}] scrape`);
-  } finally {
-    await browser.close();
-  }
+  filtered.sort((a, b) => a.price - b.price);
+  return filtered.slice(0, 5);
 }
 
 // --- Telegram ---
@@ -536,6 +372,7 @@ cron.schedule(config.schedule, () => {
 });
 
 log(`Bot started. Schedule: ${config.schedule}`);
+
 process.on("unhandledRejection", (reason) => {
   log(`Unhandled rejection: ${formatError(reason)}`);
 });
@@ -544,4 +381,5 @@ process.on("uncaughtException", (error) => {
   log(`Uncaught exception: ${formatError(error)}`);
 });
 
+// Run once on startup so a deploy is verifiable without waiting for the next cron tick.
 runWithLock(config, "startup");

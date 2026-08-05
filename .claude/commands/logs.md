@@ -1,31 +1,26 @@
-Analyze the flightbot results log. Argument: $ARGUMENTS (empty = local only; "remote" = also tail EC2 log)
+Analyze the flightbot results log. Argument: $ARGUMENTS (empty = local; "remote" = server log; "docker" = container stdout)
 
-**Local log analysis:**
+Run whichever matches:
 
-1. Read `/Users/rafael/Dev/flightbot/results.log`.
+```
+/Users/rafael/Dev/flightbot/scripts/logs.sh                 # local results.log
+/Users/rafael/Dev/flightbot/scripts/logs.sh --remote 200    # server results.log
+/Users/rafael/Dev/flightbot/scripts/logs.sh --docker 200    # container stdout
+```
 
-2. Extract all JSON alert records — lines that start with `{` and contain a `ts` field. Each has: ts, route, alertType, price, airline, stops, duration. Parse and group by route name.
+Use `--docker` when `results.log` is empty or missing — container stdout survives independently of the bind-mounted file.
 
-3. For each route, show:
-   - All alert prices in chronological order with date and alertType (first / lower / returned)
-   - Lowest price ever alerted
-   - Most recent alert
+Then analyze the output:
 
-4. Separately list all log lines containing "error", "failed", "0 result(s)", or "Timed out" as **Issues**.
-
-5. Show the first and last timestamp in the log to indicate the monitoring window.
-
-6. Print a summary table:
+1. Extract JSON alert records — lines starting with `{` containing a `ts` field, each with ts, route, alertType, price, airline, stops, duration. Group by route.
+2. Per route, report alert prices chronologically with date and alertType (first / lower / returned), the lowest price ever alerted, and the most recent alert.
+3. List lines matching `error`, `failed`, `Timed out`, or `Found 0 result` separately as **Issues**.
+4. Show the first and last timestamp to indicate the monitoring window.
+5. Print a summary table:
 
    | Route | Alerts | Best Price | Last Alert | Status |
    |-------|--------|------------|------------|--------|
 
-   Status = "Active" if a run completed in the last 24h, "Stale" otherwise. Use the current date to evaluate.
+   Status = "Active" if a run completed in the last 24h, else "Stale". Evaluate against the current date.
 
-**If $ARGUMENTS contains "remote":**
-
-Additionally SSH and tail the remote log. Connection details (`SSH_KEY_PATH`, `SSH_USER`, `SSH_HOST`) come from `.env`; source it first since each command runs in a fresh shell:
-```
-source /Users/rafael/Dev/flightbot/.env && ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "$SSH_USER@$SSH_HOST" "tail -60 /home/ec2-user/flightbot/results.log"
-```
-Then apply the same structured analysis to the remote output and show if it differs from the local log.
+If both local and remote were requested, apply the same analysis to each and call out any differences.

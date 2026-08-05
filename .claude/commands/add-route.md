@@ -2,51 +2,39 @@ Add a new flight route to the flightbot monitor based on: $ARGUMENTS
 
 Example: `/add-route GRU to JFK round trip Sep 10 return Sep 20 budget 4000 BRL max 1 stop`
 
-Steps:
+Your job is to parse intent; `scripts/config-route.js` performs the mutation.
 
-1. Read `/Users/rafael/Dev/flightbot/config.json` to understand the current routes and schema.
+1. Inspect current routes:
 
-2. Parse $ARGUMENTS to extract:
-   - Origin IATA code (e.g. GRU)
-   - Destination IATA code (e.g. JFK)
-   - Trip type: round trip or one-way
-   - Departure date → convert to YYYY-MM-DD
-   - Return date (round trip only) → convert to YYYY-MM-DD
-   - Currency (default BRL if monitoring from Brazil; ask if ambiguous)
-   - maxBudget (integer; null if not mentioned)
-   - maxStops (integer; null if not mentioned)
-   - maxDurationHours (number; null if not mentioned)
-   - flexDays (integer; 0 if not mentioned; parse from "±N days" or "flexible N")
-   - Route name in format "AAA → BBB"
-
-3. Construct the route object using this exact schema:
-   ```json
-   {
-     "name": "GRU → JFK",
-     "from": "GRU",
-     "to": "JFK",
-     "roundTrip": true,
-     "departureDate": "2026-09-10",
-     "returnDate": "2026-09-20",
-     "flexDays": 0,
-     "currency": "BRL",
-     "maxStops": 1,
-     "maxBudget": 4000,
-     "maxDurationHours": null,
-     "active": true
-   }
    ```
-   If any required field is ambiguous (origin, destination, departure date), ask the user before proceeding.
+   node /Users/rafael/Dev/flightbot/scripts/config-route.js list
+   ```
 
-4. Show the constructed JSON and ask for confirmation before writing to disk.
+2. Parse $ARGUMENTS into flags. Convert all dates to `YYYY-MM-DD`, resolving relative dates against the current date:
 
-5. After confirmation, append the route to the `routes` array in `config.json` and write the file. Print the updated routes list.
+   | Flag | From the request | Notes |
+   |------|------------------|-------|
+   | `--from` / `--to` | origin / destination | IATA codes |
+   | `--depart` | departure date | required |
+   | `--return` | return date | omit for one-way; presence sets `roundTrip` |
+   | `--budget` | maxBudget | omit if unmentioned |
+   | `--stops` | maxStops | omit if unmentioned |
+   | `--duration` | maxDurationHours | omit if unmentioned |
+   | `--flex` | flexDays | from "±N days" / "flexible N"; defaults to 0 |
+   | `--currency` | currency | defaults to BRL |
+   | `--name` | route name | defaults to "AAA → BBB" |
 
-6. Remind the user: `config.json` is not synced by `/deploy` (to protect live state). To push this new route to EC2, run (connection details come from `.env`; source it first since each command runs in a fresh shell):
+   If origin, destination, or departure date is ambiguous, ask before proceeding.
+
+3. Show the exact command you intend to run and ask for confirmation:
+
    ```
-   source /Users/rafael/Dev/flightbot/.env && rsync -avz -e "ssh -o StrictHostKeyChecking=no -i \"$SSH_KEY_PATH\"" /Users/rafael/Dev/flightbot/config.json "$SSH_USER@$SSH_HOST:/home/ec2-user/flightbot/config.json"
+   node /Users/rafael/Dev/flightbot/scripts/config-route.js add --from GRU --to JFK \
+     --depart 2026-09-10 --return 2026-09-20 --budget 4000 --stops 1
    ```
-   Then restart the container so the bot picks up the new config:
-   ```
-   source /Users/rafael/Dev/flightbot/.env && ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "$SSH_USER@$SSH_HOST" "cd /home/ec2-user/flightbot && docker-compose restart"
-   ```
+
+4. After confirmation, run it. The script validates date formats, rejects duplicate names, and prints the added route as JSON. It exits non-zero on error — report the message rather than retrying blindly.
+
+5. Remind the user that `config.json` is **not** synced by `/deploy` (it is live server state). To apply the new route in production, copy `config.json` up and restart the container.
+
+Note: `--stops 0` also makes the scraper append `nonstop` to the Google Flights query, which narrows what the page renders. The post-extraction filter still enforces it.

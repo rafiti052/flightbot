@@ -5,7 +5,7 @@
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js",
-    "install-browsers": "npx playwright install chromium"
+    "install-browsers": "pnpm exec playwright install chromium"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.85.0",
