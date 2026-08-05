@@ -45,7 +45,7 @@ remote_ssh() {
 remote_rsync() {
   local src="$1"
   local dest="${2:-}"
-  rsync -az --info=stats0 \
+  rsync -az \
     -e "ssh ${SSH_OPTS[*]}" \
     "${src}" "${SSH_TARGET}:${REMOTE_DIR}/${dest}"
 }
