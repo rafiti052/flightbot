@@ -8,6 +8,7 @@ import {
   extractFlightsFromScreenshot,
   filterFlights,
 } from "./scraper.js";
+import * as ui from "./ui.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ENV_PATH = path.join(__dirname, ".env");
@@ -71,10 +72,12 @@ function savePrices(prices) {
 
 function log(msg) {
   const line = `[${new Date().toISOString()}] ${msg}`;
-  try {
-    console.log(line);
-  } catch {
-    // Ignore console failures so we can still attempt file logging.
+  if (!ui.isTty) {
+    try {
+      console.log(line);
+    } catch {
+      // Ignore console failures so we can still attempt file logging.
+    }
   }
   try {
     fs.appendFileSync(LOG_PATH, line + "\n");
@@ -109,6 +112,132 @@ function formatError(err) {
   return String(err);
 }
 
+function firstErrorLine(err) {
+  const value = err instanceof Error ? err.message : String(err);
+  return value.split("\n", 1)[0];
+}
+
+function scheduleLabel(schedule) {
+  const match = String(schedule).match(/^0 ([\d,]+) \* \* \*$/);
+  if (!match) return schedule;
+  const hours = match[1]
+    .split(",")
+    .map((hour) => String(Number(hour)).padStart(2, "0"))
+    .join(", ");
+  return `every day at ${hours}`;
+}
+
+function routeLabel(route, routeWidth) {
+  const missing = Math.max(0, routeWidth - ui.displayWidth(route.name));
+  return `${route.name}${" ".repeat(missing)}`;
+}
+
+function routeLog(route, message) {
+  const separator = String(message).startsWith(" ") ? "" : " ";
+  log(`[${route.name}]${separator}${message}`);
+}
+
+let viewRouteWidth = 0;
+
+const view = {
+  boot(config) {
+    log(`Bot started. Schedule: ${config.schedule}`);
+    if (!ui.isTty) return;
+    const activeRoutes = config.routes.filter((route) => route.active);
+    viewRouteWidth = Math.max(0, ...activeRoutes.map((route) => ui.displayWidth(route.name)));
+    console.log(ui.title("flightbot", `${activeRoutes.length} route${activeRoutes.length === 1 ? "" : "s"} ${ui.glyph.dot} ${scheduleLabel(config.schedule)}`));
+    console.log();
+  },
+
+  runStart() {
+    log("=== Bot run started ===");
+    if (ui.isTty) {
+      console.log(ui.c.dim(`run ${new Date().toLocaleTimeString("en-GB", { hour12: false })}`));
+      console.log(ui.rule());
+    }
+  },
+
+  routeStart(route) {
+    log(`[${route.name}] Checking...`);
+    if (ui.isTty) console.log(`${routeLabel(route, viewRouteWidth)}  ${ui.c.dim("checking")}`);
+  },
+
+  routeProgress(route, message, logMessage = message) {
+    routeLog(route, logMessage);
+    if (!ui.isTty) return;
+    const prefix = `${routeLabel(route, viewRouteWidth)}  `;
+    console.log(prefix + ui.c.dim(ui.truncate(message, ui.width() - ui.displayWidth(prefix))));
+  },
+
+  routeOk(route, count, best) {
+    log(`[${route.name}] Best price: ${best.price}`);
+    if (!ui.isTty) return;
+    const parts = [
+      `${count} flight${count === 1 ? "" : "s"}`,
+      `best ${ui.money(best.price, route.currency)}`,
+    ];
+    if (route.maxBudget !== null && route.maxBudget !== undefined) {
+      parts.push(`budget ${ui.money(route.maxBudget, route.currency)}`);
+    }
+    console.log(`${routeLabel(route, viewRouteWidth)}  ${ui.status("ok", parts.join(` ${ui.glyph.dot} `))}`);
+  },
+
+  routeErr(route, logMessage, err = logMessage) {
+    routeLog(route, logMessage);
+    if (!ui.isTty) return;
+    const suffix = ui.c.dim(" (stack in results.log)");
+    console.log(`${routeLabel(route, viewRouteWidth)}  ${ui.status("err", firstErrorLine(err))}${suffix}`);
+  },
+
+  alert(route, alertType) {
+    log("Telegram alert sent successfully");
+    if (ui.isTty) console.log(`${routeLabel(route, viewRouteWidth)}  ${ui.status("alert", `alert sent (${alertType})`)}`);
+  },
+
+  runtimeErr(logMessage, err) {
+    log(logMessage);
+    if (ui.isTty) console.error(ui.status("err", firstErrorLine(err)));
+  },
+
+  runEnd(startedAt, outcomes) {
+    log("=== Bot run complete ===");
+    if (!ui.isTty) return;
+
+    const alertCount = outcomes.filter((outcome) => outcome.alertType).length;
+    const errorCount = outcomes.filter((outcome) => outcome.error).length;
+    const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
+    const rows = outcomes.map((outcome) => {
+      let delta = "—";
+      if (outcome.best !== null && outcome.prevPrice !== null) {
+        const difference = outcome.best - outcome.prevPrice;
+        if (difference < 0) delta = `${ui.glyph.down} ${Math.abs(difference).toLocaleString("pt-BR")}`;
+        else if (difference > 0) delta = `${ui.glyph.up} ${difference.toLocaleString("pt-BR")}`;
+        else delta = "— 0";
+      }
+      return {
+        route: outcome.route.name,
+        best: ui.money(outcome.best, outcome.route.currency),
+        budget: ui.money(outcome.budget, outcome.route.currency),
+        delta,
+        status: outcome.error ? "error" : outcome.alertType ? "alerted" : "silent",
+      };
+    });
+
+    console.log(ui.rule());
+    console.log(`done in ${ui.dur(Date.now() - startedAt)} ${ui.glyph.dot} ${plural(alertCount, "alert")} ${ui.glyph.dot} ${plural(errorCount, "error")}`);
+    if (rows.length > 0) {
+      console.log();
+      console.log(ui.table([
+        { key: "route", header: "route" },
+        { key: "best", header: "best", align: "right" },
+        { key: "budget", header: "budget", align: "right" },
+        { key: "delta", header: "Δ last", align: "right" },
+        { key: "status", header: "status" },
+      ], rows));
+    }
+  },
+};
+
 // --- Date helpers ---
 
 function shiftDate(dateStr, days) {
@@ -137,15 +266,15 @@ function dateVariants(route) {
 
 async function scrapeFlights(route, apiKey) {
   const screenshot = await captureFlightsScreenshot(route, {
-    log: (msg) => log(`[${route.name}] ${msg}`),
+    log: (msg) => view.routeProgress(route, msg),
   });
-  log(`[${route.name}] Screenshot captured, sending to Claude...`);
+  view.routeProgress(route, "Screenshot captured, sending to Claude...");
 
   const { flights, rawText, parseError } = await extractFlightsFromScreenshot(screenshot, route, apiKey);
   if (parseError) {
-    log(`[${route.name}] Claude extraction failed to parse JSON. Raw: ${rawText.slice(0, 300)}`);
+    view.routeProgress(route, `Claude extraction failed to parse JSON. Raw: ${rawText.slice(0, 300)}`);
   }
-  log(`[${route.name}] Claude extracted ${flights.length} flight(s)`);
+  view.routeProgress(route, `Claude extracted ${flights.length} flight(s)`);
 
   // maxBudget is intentionally not applied here — evaluateAlert() needs to see
   // over-budget prices to track lastSeenPrice.
@@ -175,11 +304,13 @@ async function sendTelegram(token, chatId, message) {
     if (!res.ok) {
       const body = await res.text();
       log(`Telegram error ${res.status}: ${body}`);
+      return false;
     } else {
-      log("Telegram alert sent successfully");
+      return true;
     }
   } catch (e) {
     log(`Telegram send failed: ${e.message}`);
+    return false;
   }
 }
 
@@ -252,8 +383,10 @@ function evaluateAlert(route, best, state) {
 // --- Main run loop ---
 
 async function run(config) {
-  log("=== Bot run started ===");
+  const startedAt = Date.now();
+  view.runStart();
   const prices = loadPrices();
+  const outcomes = [];
 
   const activeRoutes = config.routes.filter((r) => {
     if (!r.active) {
@@ -265,22 +398,24 @@ async function run(config) {
 
   for (let i = 0; i < activeRoutes.length; i++) {
     const route = activeRoutes[i];
-    log(`[${route.name}] Checking...`);
+    view.routeStart(route);
 
     const variants = dateVariants(route);
 
     // Scrape variants sequentially to avoid bot detection and resource exhaustion
     const variantResults = [];
+    let routeError = null;
     for (const variant of variants) {
       const label = variant._dateLabel ? ` (${variant._dateLabel})` : "";
-      log(`[${route.name}]${label} Scraping...`);
+      view.routeProgress(route, `${label.trimStart()} Scraping...`.trimStart(), `${label} Scraping...`);
       try {
         const results = await scrapeFlights(variant, config.anthropic.apiKey);
-        log(`[${route.name}]${label} Found ${results.length} result(s)`);
+        view.routeProgress(route, `${label.trimStart()} Found ${results.length} result(s)`.trimStart(), `${label} Found ${results.length} result(s)`);
         for (const r of results) r._variant = variant;
         variantResults.push(results);
       } catch (e) {
-        log(`[${route.name}]${label} Scrape error: ${e.message}`);
+        routeError ??= e;
+        view.routeErr(route, `${label} Scrape error: ${e.message}`, e);
         variantResults.push([]);
       }
       // Random delay between requests to avoid bot detection
@@ -290,15 +425,25 @@ async function run(config) {
     const allResults = variantResults.flat();
 
     if (allResults.length === 0) {
-      log(`[${route.name}] No results across all date variants, skipping`);
+      const noResultsError = routeError ?? new Error("No results across all date variants");
+      view.routeErr(route, "No results across all date variants, skipping", noResultsError);
+      outcomes.push({
+        route,
+        best: null,
+        budget: route.maxBudget ?? null,
+        alertType: null,
+        prevPrice: prices[route.name]?.lastSeenPrice ?? null,
+        error: noResultsError,
+      });
       continue;
     }
 
     allResults.sort((a, b) => a.price - b.price);
     const best = allResults[0];
-    log(`[${route.name}] Best price: ${best.price}`);
+    view.routeOk(route, allResults.length, best);
 
     const state = prices[route.name] ?? null;
+    const prevPrice = state?.lastSeenPrice ?? null;
     const alertType = evaluateAlert(route, best, state);
     const now = new Date().toISOString();
 
@@ -316,7 +461,8 @@ async function run(config) {
 
       const bestRoute = best._variant ?? route;
       const message = formatMessage(bestRoute, best, alertType);
-      await sendTelegram(config.telegram.token, config.telegram.chatId, message);
+      const sent = await sendTelegram(config.telegram.token, config.telegram.chatId, message);
+      if (sent) view.alert(route, alertType);
     } else {
       log(`[${route.name}] No alert (price: ${best.price}, lastAlertPrice: ${state?.lastAlertPrice ?? "none"})`);
       prices[route.name] = {
@@ -327,13 +473,22 @@ async function run(config) {
       savePrices(prices);
     }
 
+    outcomes.push({
+      route,
+      best: best.price,
+      budget: route.maxBudget ?? null,
+      alertType,
+      prevPrice,
+      error: routeError,
+    });
+
     // Rate limiting between routes
     if (i < activeRoutes.length - 1) {
       await new Promise((r) => setTimeout(r, 5000));
     }
   }
 
-  log("=== Bot run complete ===");
+  view.runEnd(startedAt, outcomes);
 }
 
 let runState = {
@@ -356,7 +511,7 @@ async function runWithLock(config, trigger) {
   try {
     await run(config);
   } catch (e) {
-    log(`${trigger === "startup" ? "Initial" : "Scheduled"} run failed: ${formatError(e)}`);
+    view.runtimeErr(`${trigger === "startup" ? "Initial" : "Scheduled"} run failed: ${formatError(e)}`, e);
   } finally {
     runState = { inProgress: false, startedAt: 0 };
   }
@@ -364,21 +519,28 @@ async function runWithLock(config, trigger) {
 
 // --- Entry point ---
 
-const config = loadConfig();
+let config;
+try {
+  config = loadConfig();
+} catch (e) {
+  const message = `config error: ${firstErrorLine(e)} — check .env`;
+  console.error(ui.status("err", message));
+  process.exit(1);
+}
 
 cron.schedule(config.schedule, () => {
   const freshConfig = loadConfig();
   runWithLock(freshConfig, "schedule");
 });
 
-log(`Bot started. Schedule: ${config.schedule}`);
+view.boot(config);
 
 process.on("unhandledRejection", (reason) => {
-  log(`Unhandled rejection: ${formatError(reason)}`);
+  view.runtimeErr(`Unhandled rejection: ${formatError(reason)}`, reason);
 });
 
 process.on("uncaughtException", (error) => {
-  log(`Uncaught exception: ${formatError(error)}`);
+  view.runtimeErr(`Uncaught exception: ${formatError(error)}`, error);
 });
 
 // Run once on startup so a deploy is verifiable without waiting for the next cron tick.

@@ -5,7 +5,7 @@
 #
 #   source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 #
-# Provides: REPO_ROOT, remote_ssh, remote_rsync, require_container, die, info
+# Provides: REPO_ROOT, remote_ssh, remote_rsync, require_container, formatting helpers
 
 set -euo pipefail
 
@@ -13,9 +13,30 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENV_FILE="${REPO_ROOT}/.env"
 REMOTE_DIR="${FLIGHTBOT_REMOTE_DIR:-/home/ec2-user/flightbot}"
 CONTAINER="${FLIGHTBOT_CONTAINER:-flightbot}"
+ISSUE_PATTERN='error|failed|Timed out|Found 0 result'
 
-die()  { echo "error: $*" >&2; exit 1; }
-info() { echo "==> $*"; }
+if [[ -t 1 && -z ${NO_COLOR:-} && ${TERM:-} != dumb ]]; then
+  UI_BOLD=$'\033[1m'
+  UI_DIM=$'\033[2m'
+  UI_GREEN=$'\033[32m'
+  UI_YELLOW=$'\033[33m'
+  UI_RED=$'\033[31m'
+  UI_RESET=$'\033[0m'
+else
+  UI_BOLD=""
+  UI_DIM=""
+  UI_GREEN=""
+  UI_YELLOW=""
+  UI_RED=""
+  UI_RESET=""
+fi
+
+step()   { echo "${UI_BOLD}==> $*${UI_RESET}"; }
+ok()     { echo "${UI_GREEN}✓${UI_RESET} $*"; }
+warn()   { echo "${UI_YELLOW}!${UI_RESET} $*"; }
+detail() { echo "${UI_DIM}  $*${UI_RESET}"; }
+die()    { echo "${UI_RED}error:${UI_RESET} $*" >&2; exit 1; }
+info()   { step "$@"; }
 
 # Load .env without echoing secrets.
 [[ -f "${ENV_FILE}" ]] || die "Missing ${ENV_FILE}. Copy .env.example to .env and fill it in."

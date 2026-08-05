@@ -16,15 +16,15 @@ case "${MODE}" in
   local)
     LOG="${REPO_ROOT}/results.log"
     [[ -f "${LOG}" ]] || die "No local results.log at ${LOG}"
-    info "Local results.log (${LOG})"
+    step "Local results.log (${LOG})"
     cat "${LOG}"
     ;;
   --remote)
-    info "Remote results.log (last ${LINES})"
+    step "Remote results.log (last ${LINES})"
     remote_ssh "tail -${LINES} ${REMOTE_DIR}/results.log 2>/dev/null || echo '(results.log missing or empty)'"
     ;;
   --docker)
-    info "Container stdout (last ${LINES})"
+    step "Container stdout (last ${LINES})"
     remote_ssh "docker logs --tail ${LINES} ${CONTAINER} 2>&1"
     ;;
   *)

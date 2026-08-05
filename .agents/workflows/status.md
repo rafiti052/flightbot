@@ -6,13 +6,13 @@ Run:
 scripts/status.sh
 ```
 
-It reports container health, the last run markers, recent best prices, an issue count with samples, and live `prices.json` — all from the server.
+It makes one server request and prints a formatted report with the container verdict, last and next run, per-route prices, budgets, and recent issues.
 
-Then read the local `config.json` and combine both into a report:
+Relay that report directly. Do not re-derive its tables from raw log lines; the formatter already combines remote state with local `config.json`. Add commentary only when the user needs interpretation:
 
-1. A table of routes: name, active, `maxBudget`, `lastSeenPrice` from `prices.json`, and whether the last seen price is under or over budget. Show "no data yet" where `prices.json` has no entry.
-2. The cron `schedule` translated to human-readable local times (e.g. "8:00, 11:00, 14:00, 17:00, 20:00, 23:00 daily").
-3. Any issues the script surfaced, listed separately.
+1. Explain any `DOWN` or `DEGRADED` verdict and its surfaced issues.
+2. Note that an over-budget route with a successful scrape is correctly silent.
+3. Call out missing route data or a stale/incomplete run.
 
 Finish with a compact summary: container health, time of last run, recent alerts, and issues found.
 
