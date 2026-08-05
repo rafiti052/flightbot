@@ -154,7 +154,7 @@ docker-compose up -d
 
 ## Scripts
 
-Deterministic scripts in `scripts/` back the `.claude/commands/` slash commands and are usable directly. Shell scripts read the `SSH_*` vars from `.env` and exit non-zero on failure.
+Deterministic scripts in `scripts/` back the operational workflows in `.agents/workflows/` (exposed as slash commands via symlinks in `.claude/commands/` and `.cursor/commands/`) and are usable directly. Shell scripts read the `SSH_*` vars from `.env` and exit non-zero on failure.
 
 | Script | Purpose |
 |--------|---------|

@@ -1,9 +1,9 @@
 /**
  * Shared Google Flights scrape path.
  *
- * Both bot.js (production) and test-run.js (smoke test) import from here so the
- * test exercises the same code the bot runs. Callers inject their own logger:
- * bot.js appends to results.log, test-run.js prints to the console.
+ * Both bot.js (production) and scripts/test-scrape.js (smoke test) import from here so
+ * the test exercises the same code the bot runs. Callers inject their own logger:
+ * bot.js appends to results.log, scripts/test-scrape.js prints to the console.
  */
 
 import { chromium } from "playwright";

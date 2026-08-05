@@ -8,6 +8,6 @@ COPY package.json pnpm-lock.yaml ./
 RUN corepack enable && pnpm install --prod --frozen-lockfile
 
 COPY bot.js scraper.js ./
-COPY scripts/ ./scripts/
+COPY scripts/test-scrape.js ./scripts/
 
 CMD ["node", "bot.js"]
