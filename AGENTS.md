@@ -75,6 +75,17 @@ Canonical definitions live in `.agents/workflows/`. Claude Code and Cursor expos
 commands via symlinks in `.claude/commands/` and `.cursor/commands/`. Other tools should read
 the workflow file directly and run the `scripts/` command it names.
 
+## Terminal output
+
+- `ui.js` owns the terminal design roles, glyph fallbacks, width-aware tables, money and
+  duration formatting, and TTY-only progress behavior. Reuse its semantic helpers instead
+  of embedding ANSI codes in callers.
+- Interactive TTY runs use the formatted view. Non-TTY stdout (Docker, CI, and pipes) keeps
+  the timestamped plain-log shape used by operational tooling.
+- `NO_COLOR` disables ANSI styling. `FORCE_COLOR` enables it unless set to `0`.
+- `results.log` is never colorized. Its wording and JSON alert lines are a parsed public
+  contract; update every consumer before changing them.
+
 ## Notes
 
 - Rate limiting: 3–6s random delay between date variants; 5s between routes

@@ -20,6 +20,6 @@ Then report:
 2. Whether the container came back `Up`.
 3. Whether the tailed log shows a clean start.
 
-If the script exits non-zero, or the log contains `error`, `failed`, `Timed out`, or `Found 0 result`, print the relevant lines and **stop — do not declare success**.
+If the script exits non-zero, or the log matches the canonical `ISSUE_PATTERN` from `scripts/lib/common.sh`, print the relevant lines and **stop — do not declare success**.
 
 To push a changed `config.json` (deliberately not synced by deploy), use `/reset-route` or copy it explicitly, then restart the container so the new config is picked up.

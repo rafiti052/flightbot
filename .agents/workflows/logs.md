@@ -14,7 +14,7 @@ Then analyze the output:
 
 1. Extract JSON alert records — lines starting with `{` containing a `ts` field, each with ts, route, alertType, price, airline, stops, duration. Group by route.
 2. Per route, report alert prices chronologically with date and alertType (first / lower / returned), the lowest price ever alerted, and the most recent alert.
-3. List lines matching `error`, `failed`, `Timed out`, or `Found 0 result` separately as **Issues**.
+3. List lines matching the canonical `ISSUE_PATTERN` from `scripts/lib/common.sh` separately as **Issues**.
 4. Show the first and last timestamp to indicate the monitoring window.
 5. Print a summary table:
 
