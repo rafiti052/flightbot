@@ -210,7 +210,7 @@ T18 -> T23
 
 ### T12: Migrate route manager
 
-**Status**: Pending
+**Status**: Complete
 **What**: Rename/type route management and expose an argv/path/output function while retaining CLI behavior.
 **Where**: `scripts/config-route.ts`
 **Depends on**: T02
