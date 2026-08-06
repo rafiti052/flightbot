@@ -130,7 +130,7 @@ T18 -> T23
 
 ### T06: Migrate task validator
 
-**Status**: Pending
+**Status**: Complete
 **What**: Port task validation with identical fields, dependencies, diagrams, warnings, and resolution semantics.
 **Where**: `.agents/skills/tlc-spec-driven/scripts/validate_tasks.ts`
 **Depends on**: T02
