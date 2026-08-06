@@ -14,11 +14,16 @@ function expectSkill(skill: string, required: string[]) {
   expect(contents).toMatch(new RegExp(`^---\\nname: ${skill}\\ndescription: .+\\n---`, "s"));
   expect(fs.existsSync(path.join(directory, "agents/openai.yaml"))).toBe(true);
   for (const text of required) expect(contents).toContain(text);
-  for (const assistant of [".claude", ".cursor", ".windsurf"]) {
+  for (const assistant of [".claude", ".cursor"]) {
     const link = path.join(root, assistant, "skills", skill);
     expect(fs.lstatSync(link).isSymbolicLink()).toBe(true);
     expect(fs.realpathSync(link)).toBe(directory);
   }
+  const windsurfDirectory = path.join(root, ".windsurf", "skills", skill);
+  const windsurfSkill = path.join(windsurfDirectory, "SKILL.md");
+  expect(fs.lstatSync(windsurfDirectory).isDirectory()).toBe(true);
+  expect(fs.lstatSync(windsurfSkill).isSymbolicLink()).toBe(true);
+  expect(fs.realpathSync(windsurfSkill)).toBe(path.join(directory, "SKILL.md"));
 }
 
 describe("agent harness contracts", () => {
@@ -53,8 +58,10 @@ describe("agent harness contracts", () => {
       "explicitly authorizes",
     ])
       expect(agent).toContain(policy);
-    const link = path.join(root, ".windsurf/skills/tlc-spec-driven");
+    const link = path.join(root, ".windsurf/skills/tlc-spec-driven/SKILL.md");
     expect(fs.lstatSync(link).isSymbolicLink()).toBe(true);
-    expect(fs.realpathSync(link)).toBe(path.join(root, ".agents/skills/tlc-spec-driven"));
+    expect(fs.realpathSync(link)).toBe(
+      path.join(root, ".agents/skills/tlc-spec-driven/SKILL.md"),
+    );
   });
 });
