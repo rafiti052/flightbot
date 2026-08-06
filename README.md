@@ -6,7 +6,7 @@ A Node.js bot that monitors Google Flights for price drops and sends Telegram al
 
 ## Prerequisites
 
-- Node.js 18+ (uses native `fetch` and `process.loadEnvFile`)
+- Node.js >=20.19.0 (uses native `fetch` and `process.loadEnvFile`)
 - [pnpm](https://pnpm.io/)
 - An Anthropic API key
 - A Telegram bot (see [Connecting Telegram](#connecting-telegram))
@@ -57,10 +57,10 @@ Look for `"chat":{"id":123456789,...}`.
 ### 4. Verify it works
 
 ```bash
-node scripts/test-scrape.js
+pnpm exec tsx scripts/test-scrape.ts --no-send --json
 ```
 
-This runs the full pipeline and sends a `[TEST]` message. If Telegram rejects it, the error and HTTP status are printed — `403`/`400` almost always means step 2 was skipped.
+This runs the full pipeline without sending a Telegram message. To deliberately test Telegram after setup, omit `--no-send`. If Telegram rejects that delivery, the error and HTTP status are printed — `403`/`400` almost always means step 2 was skipped.
 
 ---
 
@@ -137,7 +137,7 @@ Standard cron syntax. `"0 8,11,14,17,20,23 * * *"` runs at 8:00, 11:00, 14:00, 1
 ## Running
 
 ```bash
-node bot.js
+pnpm run start
 ```
 
 The bot runs once immediately on startup, then follows the cron schedule.
@@ -161,8 +161,8 @@ agent-specific skill directories contain relative symlinks to it.
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/test-scrape.js ["Route"]` | Full local smoke test; saves `test-screenshot.png` and sends a `[TEST]` alert |
-| `scripts/config-route.js` | `list` / `add` / `pause` / `resume` / `reset` routes |
+| `scripts/test-scrape.ts ["Route"] --no-send --json` | Full local diagnostic smoke test; saves `test-screenshot.png` without sending Telegram |
+| `scripts/config-route.ts` | `list` / `add` / `pause` / `resume` / `reset` routes |
 | `scripts/deploy.sh [--no-cache]` | Sync code to EC2, rebuild, restart, tail the log |
 | `scripts/status.sh` | Container health, last run, issues, live `prices.json` |
 | `scripts/logs.sh [--remote\|--docker] [N]` | Print logs from the chosen source |
@@ -185,7 +185,7 @@ No alert fires while the price is above `maxBudget`. **A run that scrapes succes
 ### Resetting alert history
 
 ```bash
-node scripts/config-route.js reset "GRU → FLN"   # one route
+pnpm exec tsx scripts/config-route.ts reset "GRU → FLN"   # one route
 rm prices.json                                    # all routes
 ```
 
@@ -210,5 +210,5 @@ Logs mix human-readable lines with structured JSON records for each alert fired.
 | `403` / `400` from Telegram | You never pressed **Start** on your bot — see [step 2](#2-start-a-conversation-with-your-bot) |
 | `Found 0 result(s)` every run | Departure dates are in the past, or filters are too tight |
 | `Timed out waiting for flight cards` | Bot detection or a slow page; retry later |
-| Truncated / unparseable Claude response | Raise `max_tokens` in `scraper.js` |
+| Truncated / unparseable Claude response | Raise `max_tokens` in `scraper.ts` |
 | Alerts never fire | `maxBudget` is below the real market price — check `Best price:` lines in the log |

@@ -3,13 +3,13 @@ Run a full smoke test of the flightbot scraping pipeline for route: $ARGUMENTS
 Choose local or production:
 
 ```
-node scripts/test-scrape.js "$ARGUMENTS" --json      # local checkout
-scripts/remote-test.sh "$ARGUMENTS" --json           # deployed container
+pnpm exec tsx scripts/test-scrape.ts "$ARGUMENTS" --no-send --json  # local checkout
+scripts/remote-test.sh "$ARGUMENTS" --no-send --json                # deployed container
 ```
 
 Default to the local run unless the user says "prod", "production", or "remote". Empty `$ARGUMENTS` tests the first active route; a route name (e.g. `"GRU → FLN"`) tests that one. Quote the name — route names contain `→`.
 
-The script scrapes Google Flights, switches to the **Cheapest** tab, expands the result list, flattens sticky elements, sends the screenshot to Claude Haiku, applies filters, and sends a `[TEST]` Telegram message. Pass `--no-send` when the user wants a dry run, and `-v` without `--json` for the raw Claude response.
+The script scrapes Google Flights, switches to the **Cheapest** tab, expands the result list, flattens sticky elements, sends the screenshot to Claude Haiku, and applies filters. The diagnostic default is `--no-send --json`; use a Telegram send only when the user explicitly asks to test delivery. Use `-v` without `--json` for the raw Claude response.
 
 Steps:
 
@@ -25,8 +25,8 @@ Steps:
 4. If 0 flights were extracted:
    - Inspect `rawText`
    - Inspect the screenshot: real results page, CAPTCHA, cookie wall, or empty?
-   - Page looks right but extraction failed → the prompt in `scraper.js` → `extractFlightsFromScreenshot()` needs adjustment
-   - Truncated JSON → raise `max_tokens` in `scraper.js`
+   - Page looks right but extraction failed → the prompt in `scraper.ts` → `extractFlightsFromScreenshot()` needs adjustment
+   - Truncated JSON → raise `max_tokens` in `scraper.ts`
    - CAPTCHA or empty results → bot detection; suggest retrying later or revisiting the User-Agent / locale
    - Departure dates in the past also produce empty pages — check the route dates against today
 

@@ -1,11 +1,11 @@
 # Flight Price Monitor Bot
 
-Node.js bot that scrapes Google Flights via Playwright, uses Claude vision (Haiku) to extract flight data from screenshots, and sends Telegram alerts when prices hit or drop below budget.
+Node.js >=20.19 bot that scrapes Google Flights via Playwright, uses Claude vision (Haiku) to extract flight data from screenshots, and sends Telegram alerts when prices hit or drop below budget.
 
 ## Architecture
 
-- **`bot.js`** — entry point: config loading, cron scheduling, alert evaluation, Telegram delivery, logging
-- **`scraper.js`** — shared scrape path: URL building, Playwright page prep/capture, Claude vision extraction, filtering. Imported by both `bot.js` and `scripts/test-scrape.js` so the smoke test exercises the same code production runs.
+- **`bot.ts`** — entry point: config loading, cron scheduling, alert evaluation, Telegram delivery, logging
+- **`scraper.ts`** — shared scrape path: URL building, Playwright page prep/capture, Claude vision extraction, filtering. Imported by both `bot.ts` and `scripts/test-scrape.ts` so the smoke test exercises the same code production runs.
 - **`.env`** — secrets and account identifiers (`ANTHROPIC_KEY`, `TELEGRAM_KEY`, `TELEGRAM_CHAT_ID`) plus deploy SSH vars (`SSH_KEY_PATH`, `SSH_USER`, `SSH_HOST`). Gitignored, never commit real keys. See `.env.example`.
 - **`config.json`** — runtime config (routes, schedule) only. No secrets or account IDs.
 - **`scripts/`** — deterministic shell/node scripts backing the operational workflows in `.agents/workflows/`.
@@ -17,7 +17,7 @@ Node.js bot that scrapes Google Flights via Playwright, uses Claude vision (Haik
 1. `loadConfig()` loads `.env` (via `process.loadEnvFile`), reads `config.json`, and injects `ANTHROPIC_KEY`/`TELEGRAM_KEY`/`TELEGRAM_CHAT_ID` into `config.anthropic.apiKey` / `config.telegram.token` / `config.telegram.chatId`. It throws if any of the three is missing.
 2. `run(config)` executes immediately and then on cron schedule
 3. For each active route, `dateVariants()` expands `flexDays` into multiple departure offsets
-4. `captureFlightsScreenshot()` (scraper.js) launches headless Chromium, navigates Google Flights, switches to the **Cheapest** tab, expands "View more flights", flattens sticky/fixed elements, and takes a full-page screenshot
+4. `captureFlightsScreenshot()` (scraper.ts) launches headless Chromium, navigates Google Flights, switches to the **Cheapest** tab, expands "View more flights", flattens sticky/fixed elements, and takes a full-page screenshot
 5. `extractFlightsFromScreenshot()` sends the screenshot to `claude-haiku-4-5-20251001` via the Anthropic SDK and returns `{ flights, rawText, parseError }`
 6. `evaluateAlert()` compares best price against `maxBudget` and previous alert state
 7. `sendTelegram()` fires a Markdown message via the Bot API
@@ -54,7 +54,7 @@ Node.js bot that scrapes Google Flights via Playwright, uses Claude vision (Haik
 
 ```bash
 pnpm install && pnpm run install-browsers
-node bot.js
+pnpm run start
 ```
 
 ## Docker
@@ -83,7 +83,7 @@ or `.windsurf/`.
 
 ## Terminal output
 
-- `ui.js` owns the terminal design roles, glyph fallbacks, width-aware tables, money and
+- `ui.ts` owns the terminal design roles, glyph fallbacks, width-aware tables, money and
   duration formatting, and TTY-only progress behavior. Reuse its semantic helpers instead
   of embedding ANSI codes in callers.
 - Interactive TTY runs use the formatted view. Non-TTY stdout (Docker, CI, and pipes) keeps
@@ -98,6 +98,6 @@ or `.windsurf/`.
 - Filters (`maxStops`, `maxDurationHours`) are applied after Claude extraction, not at scrape time. When `maxStops` is `0`, `buildUrl()` also appends `nonstop` to the query as a *hint* to narrow what Google renders — the post-extraction filter remains authoritative.
 - Google Flights defaults to "Best" ranking, which can leave the cheapest itinerary entirely unrendered. `sortByCheapest()` clicks the Cheapest tab; it is non-fatal and falls back to default sort if the tab is missing.
 - Sticky/fixed elements are flattened to `position: static` before capture — otherwise Playwright's stitched full-page screenshot paints the Google header over a flight row.
-- `scraper.js` takes an injected `log` function (defaults to `console.log`); `bot.js` passes its own route-prefixed logger that appends to `results.log`.
+- `scraper.ts` takes an injected `log` function (defaults to `console.log`); `bot.ts` passes its own route-prefixed logger that appends to `results.log`.
 - `prices.json` uses route `name` as key — changing a route name resets its alert history
 - The bot uses `claude-haiku-4-5-20251001` for cost efficiency on vision tasks
