@@ -396,7 +396,7 @@ T18 -> T23
 
 ### T26: Add local Git gates
 
-**Status**: Pending
+**Status**: Complete
 **What**: Configure sequential staged ESLint-fix then Prettier and a commit-msg TLC checker through Lefthook.
 **Where**: `lefthook.yml`
 **Depends on**: T08, T10
