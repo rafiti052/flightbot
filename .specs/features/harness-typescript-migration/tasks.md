@@ -316,7 +316,7 @@ T18 -> T23
 
 ### T20: Add Claude safety hooks
 
-**Status**: Pending
+**Status**: Complete
 **What**: Configure executable PreToolUse/PostToolUse hooks with current structured permission decisions and best-effort format repair.
 **Where**: `.claude/settings.json`, `.claude/hooks/`
 **Depends on**: T02
