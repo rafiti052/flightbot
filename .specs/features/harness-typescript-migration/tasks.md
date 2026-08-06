@@ -156,7 +156,7 @@ T18 -> T23
 
 ### T08: Migrate commit checker
 
-**Status**: Pending
+**Status**: Complete
 **What**: Port conventional-commit validation and all input modes.
 **Where**: `.agents/skills/tlc-spec-driven/scripts/check_commit.ts`
 **Depends on**: T02
