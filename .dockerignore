@@ -1,0 +1,9 @@
+.git
+.env
+node_modules
+tests
+.specs
+config.json
+prices.json
+results.log
+test-screenshot.png

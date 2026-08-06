@@ -277,7 +277,7 @@ T18 -> T23
 
 ### T17: Switch Docker runtime
 
-**Status**: Pending
+**Status**: Complete
 **What**: Copy required TypeScript sources/config and execute through `tsx` with production-only dependencies and no build stage.
 **Where**: `Dockerfile`
 **Depends on**: T11

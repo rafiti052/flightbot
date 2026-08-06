@@ -4,10 +4,10 @@ FROM mcr.microsoft.com/playwright:v1.62.1-jammy
 
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN corepack enable && pnpm install --prod --frozen-lockfile
 
-COPY bot.js scraper.js ui.js ./
-COPY scripts/test-scrape.js ./scripts/
+COPY bot.ts scraper.ts ui.ts types.ts ./
+COPY scripts ./scripts
 
-CMD ["node", "bot.js"]
+CMD ["pnpm", "exec", "tsx", "bot.ts"]
