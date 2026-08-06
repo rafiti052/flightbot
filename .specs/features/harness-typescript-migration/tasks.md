@@ -169,7 +169,7 @@ T18 -> T23
 
 ### T09: Migrate lessons store
 
-**Status**: Pending
+**Status**: Complete
 **What**: Port lesson normalization, validation, lifecycle mutation, and rendering while preserving Unicode behavior.
 **Where**: `.agents/skills/tlc-spec-driven/scripts/lessons.ts`
 **Depends on**: T02
