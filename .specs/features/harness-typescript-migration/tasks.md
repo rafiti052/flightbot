@@ -236,7 +236,7 @@ T18 -> T23
 
 ### T14: Migrate scrape smoke CLI
 
-**Status**: Pending
+**Status**: Complete
 **What**: Rename/type smoke testing, export parsing/runner functions, and inject scraper/sender/filesystem boundaries.
 **Where**: `scripts/test-scrape.ts`
 **Depends on**: T04
