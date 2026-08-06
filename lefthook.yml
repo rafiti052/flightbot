@@ -1,3 +1,18 @@
-# Commands are added by T26. Keeping a valid config here makes pnpm's
-# Lefthook postinstall deterministic in every isolated worker worktree.
 min_version: 2.1.10
+
+pre-commit:
+  parallel: false
+  commands:
+    eslint:
+      glob: "*.{ts,js}"
+      run: pnpm exec eslint --fix {staged_files}
+      stage_fixed: true
+    prettier:
+      glob: "*.{ts,js}"
+      run: pnpm exec prettier --write {staged_files}
+      stage_fixed: true
+
+commit-msg:
+  commands:
+    conventional:
+      run: pnpm exec tsx .agents/skills/tlc-spec-driven/scripts/check_commit.ts {1}
