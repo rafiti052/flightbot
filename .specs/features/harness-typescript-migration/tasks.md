@@ -223,7 +223,7 @@ T18 -> T23
 
 ### T13: Migrate status formatter
 
-**Status**: Pending
+**Status**: Complete
 **What**: Rename/type status formatting and separate pure formatting from stdin/config I/O.
 **Where**: `scripts/lib/format-status.ts`
 **Depends on**: T02
