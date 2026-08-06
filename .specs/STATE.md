@@ -2,7 +2,7 @@
 
 ## Current Feature
 
-- `harness-typescript-migration` — Approved, implementation in progress.
+- `harness-typescript-migration` — Verified on 2026-08-06 with 15/15 requirements and 5/5 behavior mutations killed.
 
 ## Decisions
 
@@ -28,4 +28,4 @@
 
 | Feature | Status | Spec | Design | Tasks |
 | --- | --- | --- | --- | --- |
-| harness-typescript-migration | Implementing | `features/harness-typescript-migration/spec.md` | `features/harness-typescript-migration/design.md` | `features/harness-typescript-migration/tasks.md` |
+| harness-typescript-migration | Verified | `features/harness-typescript-migration/spec.md` | `features/harness-typescript-migration/design.md` | `features/harness-typescript-migration/tasks.md` |

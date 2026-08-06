@@ -6,10 +6,10 @@ Flightbot is an operational Node application whose JavaScript runtime and Python
 
 ## Goals
 
-- [ ] Run every application and TLC executable as strict TypeScript through `tsx` with no emitted output.
-- [ ] Preserve all observable application, CLI, log, scraper, and validator behavior.
-- [ ] Add isolated Vitest coverage and deterministic local/CI gates.
-- [ ] Raise the pinned harness score from 41/108 to at least 70%, targeting 105/108.
+- [x] Run every application and TLC executable as strict TypeScript through `tsx` with no emitted output.
+- [x] Preserve all observable application, CLI, log, scraper, and validator behavior.
+- [x] Add isolated Vitest coverage and deterministic local/CI gates.
+- [x] Raise the pinned harness score from 41/108 to at least 70%, achieving 105/108.
 
 ## Out of Scope
 
@@ -96,27 +96,27 @@ Flightbot is an operational Node application whose JavaScript runtime and Python
 
 | Requirement ID | Story | Phase | Status |
 | --- | --- | --- | --- |
-| HTM-01 | P1: strict runtime | Tasks | In Tasks |
-| HTM-02 | P1: strict runtime | Tasks | In Tasks |
-| HTM-03 | P1: strict runtime | Tasks | In Tasks |
-| HTM-04 | P1: strict runtime | Tasks | In Tasks |
-| HTM-05 | P1: strict runtime | Tasks | In Tasks |
-| HTM-06 | P1: strict runtime | Tasks | In Tasks |
-| HTM-07 | P1: guardrails | Tasks | In Tasks |
-| HTM-08 | P1: guardrails | Tasks | In Tasks |
-| HTM-09 | P1: guardrails | Tasks | In Tasks |
-| HTM-10 | P1: guardrails | Tasks | In Tasks |
-| HTM-11 | P1: quality gates | Tasks | In Tasks |
-| HTM-12 | P1: quality gates | Tasks | In Tasks |
-| HTM-13 | P1: quality gates | Tasks | In Tasks |
-| HTM-14 | P1: quality gates | Tasks | In Tasks |
-| HTM-15 | P1: quality gates | Validation | Pending |
+| HTM-01 | P1: strict runtime | Validation | Verified |
+| HTM-02 | P1: strict runtime | Validation | Verified |
+| HTM-03 | P1: strict runtime | Validation | Verified |
+| HTM-04 | P1: strict runtime | Validation | Verified |
+| HTM-05 | P1: strict runtime | Validation | Verified |
+| HTM-06 | P1: strict runtime | Validation | Verified |
+| HTM-07 | P1: guardrails | Validation | Verified |
+| HTM-08 | P1: guardrails | Validation | Verified |
+| HTM-09 | P1: guardrails | Validation | Verified |
+| HTM-10 | P1: guardrails | Validation | Verified |
+| HTM-11 | P1: quality gates | Validation | Verified |
+| HTM-12 | P1: quality gates | Validation | Verified |
+| HTM-13 | P1: quality gates | Validation | Verified |
+| HTM-14 | P1: quality gates | Validation | Verified |
+| HTM-15 | P1: quality gates | Validation | Verified |
 
 **Coverage:** 15 total, 15 mapped to tasks, 0 unmapped.
 
 ## Success Criteria
 
-- [ ] `pnpm run check`, shell syntax checks, TLC validation, Docker verification, inactive-route boot, and `git diff --check` pass.
-- [ ] No Python executable or obsolete JavaScript application path remains.
-- [ ] `pnpm run harness:check` reports at least 70 percent.
-- [ ] Independent validation is PASS with at least five killed mutations.
+- [x] `pnpm run check`, shell syntax checks, TLC validation, Docker verification, inactive-route boot, and `git diff --check` pass.
+- [x] No Python executable or obsolete JavaScript application path remains.
+- [x] `pnpm run harness:check` reports at least 70 percent.
+- [x] Independent validation is PASS with at least five killed mutations.

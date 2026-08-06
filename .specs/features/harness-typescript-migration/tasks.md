@@ -5,7 +5,7 @@
 Implement with the `tlc-spec-driven` skill Execute flow. Every task ends with its focused test, task status update, conventional-commit validation, and one atomic commit. Use at most three `gpt-5.6-terra` medium workers in isolated worktrees; workers cannot spawn subagents or widen owned files. The root integrates commits in task order and retains only task IDs, commit hashes, test counts, and deviations.
 
 **Design**: `.specs/features/harness-typescript-migration/design.md`
-**Status**: In Progress
+**Status**: Done
 
 ## Test Coverage Matrix
 
@@ -411,7 +411,7 @@ T18 -> T23
 
 ### T27: Verify requirements and discrimination sensor
 
-**Status**: Pending
+**Status**: Complete
 **What**: Run all deterministic gates, then dispatch a fresh Terra-medium verifier to write an evidence-backed PASS/FAIL report and kill at least five isolated behavior mutations.
 **Where**: `.specs/features/harness-typescript-migration/validation.md`
 **Depends on**: T25, T26
