@@ -22,4 +22,4 @@ grep -iE '${ISSUE_PATTERN}' ${REMOTE_DIR}/results.log 2>/dev/null | tail -30 || 
 echo __PRICES__
 cat ${REMOTE_DIR}/prices.json 2>/dev/null || echo '{}'
 echo __END__
-" | node "${REPO_ROOT}/scripts/lib/format-status.js"
+" | pnpm exec tsx "${REPO_ROOT}/scripts/lib/format-status.ts"

@@ -290,7 +290,7 @@ T18 -> T23
 
 ### T18: Switch operational shell invocations
 
-**Status**: Pending
+**Status**: Complete
 **What**: Update deploy sync lists, status, and remote-test commands to TypeScript without executing deployment.
 **Where**: `scripts/**/*.sh`
 **Depends on**: T11, T12, T13, T14
