@@ -117,7 +117,7 @@ T18 -> T23
 
 ### T05: Migrate specification validator
 
-**Status**: Pending
+**Status**: Complete
 **What**: Port `validate_spec.py` to import-safe strict TypeScript and delete Python only after parity fixtures pass.
 **Where**: `.agents/skills/tlc-spec-driven/scripts/validate_spec.ts`
 **Depends on**: T02
