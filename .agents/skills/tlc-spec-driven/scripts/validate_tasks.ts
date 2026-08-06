@@ -1,14 +1,190 @@
 import fs from "node:fs";
 import path from "node:path";
-const required = ["Test Coverage Matrix", "Gate Check Commands", "Execution Plan", "Task Breakdown"];
-const taskRe = /^#{2,4}\s+(T\d+)\s*:/i, edgeRe = /\bT\d+\b/g, fileRe = /[\w./-]+\.\w{1,6}\b/g;
+const required = [
+  "Test Coverage Matrix",
+  "Gate Check Commands",
+  "Execution Plan",
+  "Task Breakdown",
+];
+const taskRe = /^#{2,4}\s+(T\d+)\s*:/i,
+  edgeRe = /\bT\d+\b/g,
+  fileRe = /[\w./-]+\.\w{1,6}\b/g;
 type Task = { deps: Set<string>; tests?: string; gate?: string; where: string };
-export function resolveTasks(target: string | undefined, root: string): string | undefined { if (target) { if (fs.existsSync(target) && fs.statSync(target).isFile()) return target; if (fs.existsSync(target) && fs.statSync(target).isDirectory()) { const file = path.join(target, "tasks.md"); return fs.existsSync(file) ? file : autodetect(target); } const file = path.join(root, ".specs/features", target, "tasks.md"); return fs.existsSync(file) ? file : undefined; } return autodetect(root); }
-function autodetect(root: string): string | undefined { const base = path.join(root, ".specs/features"); if (!fs.existsSync(base)) return undefined; const names = fs.readdirSync(base).sort().filter((name) => fs.existsSync(path.join(base, name, "tasks.md"))); if (names.length === 1) return path.join(base, names[0], "tasks.md"); if (names.length > 1) throw new Error(`validate_tasks: multiple features found; pass one explicitly:\n  ${names.map((name) => path.join(base, name, "tasks.md")).join("\n  ")}`); return undefined; }
-export function parseTasks(lines: string[]): Map<string, Task> { const tasks = new Map<string, Task>(); let current: Task | undefined; for (const line of lines) { const header = taskRe.exec(line.trim()); if (header) { current = { deps: new Set(), where: "" }; tasks.set(header[1].toUpperCase(), current); continue; } if (!current) continue; const value = (label: string) => new RegExp(`^\\*{0,2}${label}\\*{0,2}\\s*:\\s*(.*)$`, "i").exec(line.trim())?.[1]; const deps = value("Depends on"); if (deps !== undefined && !deps.toLowerCase().includes("none")) for (const id of deps.toUpperCase().match(edgeRe) ?? []) current.deps.add(id); const where = value("Where"); if (where !== undefined) current.where = where; const tests = value("Tests"); if (tests !== undefined) current.tests = tests.trim(); const gate = value("Gate"); if (gate !== undefined) current.gate = gate.trim(); } return tasks; }
-function phases(lines: string[]) { const out = new Map<string, number>(); let phase: number | undefined; for (const line of lines) { const found = /^#{2,4}\s+Phase\s+(\d+)/i.exec(line.trim()); if (found) { phase = Number(found[1]); continue; } const task = taskRe.exec(line.trim()); if (phase !== undefined && task) out.set(task[1].toUpperCase(), phase); } return out; }
-function diagram(lines: string[]) { const edges = new Set<string>(); let fence = false, parsed = false; for (const line of lines) { if (line.trim().startsWith("```")) { fence = !fence; continue; } if (!fence || !line.includes("->") && !line.includes("→")) continue; const segments = line.replaceAll("→", "->").split("->").map((part) => (part.toUpperCase().match(edgeRe) ?? []).at(-1)); for (let i = 0; i < segments.length - 1; i += 1) if (segments[i] && segments[i + 1]) { edges.add(`${segments[i]}>${segments[i + 1]}`); parsed = true; } } return { edges, parsed }; }
-export function check(tasksPath: string) { const lines = fs.readFileSync(tasksPath, "utf8").split(/\r?\n/), errors: string[] = [], warnings: string[] = []; for (const name of required) if (!lines.some((line) => new RegExp(`^#{1,4}\\s+${name}\\b`).test(line.trim()))) errors.push(`missing required section: ## ${name}`); const tasks = parseTasks(lines); if (!tasks.size) return { errors, warnings: [...warnings, "no tasks (### T1: ...) parsed - is this file filled in?"] }; for (const [id, task] of tasks) { if (task.tests === undefined) errors.push(`${id}: missing \`Tests\` field`); else if (task.tests.toLowerCase().startsWith("none")) warnings.push(`${id}: Tests: none - confirm the Test Coverage Matrix says 'none' for this layer`); if (task.gate === undefined) errors.push(`${id}: missing \`Gate\` field`); const files = [...new Set(task.where.match(fileRe) ?? [])]; if (files.length > 1) warnings.push(`${id}: \`Where\` names multiple files ${JSON.stringify(files.sort()).replaceAll('"', "'")} - granularity smell, consider splitting`); }
- const members = phases(lines); for (const [id, task] of tasks) for (const dep of task.deps) if ((members.get(dep) ?? -Infinity) > (members.get(id) ?? Infinity)) errors.push(`${id} (phase ${members.get(id)}) depends on ${dep} (phase ${members.get(dep)}) - dependencies must point backward or within the same phase`); const { edges, parsed } = diagram(lines); if (!parsed) warnings.push("diagram arrows not parsed confidently - diagram/definition cross-check skipped (verify by hand)"); else { const defs = new Set<string>(); for (const [id, task] of tasks) for (const dep of task.deps) defs.add(`${dep}>${id}`); const same = (edge: string) => { const [a, b] = edge.split(">"); return !members.has(a) || !members.has(b) || members.get(a) === members.get(b); }; for (const edge of [...edges].filter((edge) => !defs.has(edge) && same(edge)).sort()) { const [a,b] = edge.split(">"); if (tasks.has(a) && tasks.has(b)) errors.push(`diagram shows ${a} -> ${b} but ${b} has no matching \`Depends on: ${a}\``); } for (const edge of [...defs].filter((edge) => !edges.has(edge) && same(edge)).sort()) { const [a,b] = edge.split(">"); errors.push(`${b} declares \`Depends on: ${a}\` but the diagram has no ${a} -> ${b} arrow`); } } return { errors, warnings }; }
-export function main(argv = process.argv.slice(2)): number { let target: string | undefined, root = ".", strict = false; for (let i=0;i<argv.length;i+=1) if (argv[i] === "--root") root = argv[++i] ?? "."; else if (argv[i] === "--strict") strict = true; else if (!target) target=argv[i]; else { console.error("usage: validate_tasks.ts [target] [--root DIR] [--strict]"); return 2; } let file: string | undefined; try { file=resolveTasks(target, root); } catch (e) { console.error(e instanceof Error ? e.message : String(e)); return 2; } if (!file) { console.error("validate_tasks: could not locate a tasks.md. Pass a path or run from the project root."); return 2; } const {errors,warnings}=check(file); warnings.forEach((x)=>console.log(`  WARN  ${x}`)); errors.forEach((x)=>console.log(`  ERROR ${x}`)); console.log(`\nvalidate_tasks: ${errors.length} error(s), ${warnings.length} warning(s) in ${file}`); return errors.length || strict && warnings.length ? 1 : 0; }
-if (import.meta.url === `file://${process.argv[1]}`) process.exitCode=main();
+export function resolveTasks(target: string | undefined, root: string): string | undefined {
+  if (target) {
+    if (fs.existsSync(target) && fs.statSync(target).isFile()) return target;
+    if (fs.existsSync(target) && fs.statSync(target).isDirectory()) {
+      const file = path.join(target, "tasks.md");
+      return fs.existsSync(file) ? file : autodetect(target);
+    }
+    const file = path.join(root, ".specs/features", target, "tasks.md");
+    return fs.existsSync(file) ? file : undefined;
+  }
+  return autodetect(root);
+}
+function autodetect(root: string): string | undefined {
+  const base = path.join(root, ".specs/features");
+  if (!fs.existsSync(base)) return undefined;
+  const names = fs
+    .readdirSync(base)
+    .sort()
+    .filter((name) => fs.existsSync(path.join(base, name, "tasks.md")));
+  if (names.length === 1) return path.join(base, names[0], "tasks.md");
+  if (names.length > 1)
+    throw new Error(
+      `validate_tasks: multiple features found; pass one explicitly:\n  ${names.map((name) => path.join(base, name, "tasks.md")).join("\n  ")}`,
+    );
+  return undefined;
+}
+export function parseTasks(lines: string[]): Map<string, Task> {
+  const tasks = new Map<string, Task>();
+  let current: Task | undefined;
+  for (const line of lines) {
+    const header = taskRe.exec(line.trim());
+    if (header) {
+      current = { deps: new Set(), where: "" };
+      tasks.set(header[1].toUpperCase(), current);
+      continue;
+    }
+    if (!current) continue;
+    const value = (label: string) =>
+      new RegExp(`^\\*{0,2}${label}\\*{0,2}\\s*:\\s*(.*)$`, "i").exec(line.trim())?.[1];
+    const deps = value("Depends on");
+    if (deps !== undefined && !deps.toLowerCase().includes("none"))
+      for (const id of deps.toUpperCase().match(edgeRe) ?? []) current.deps.add(id);
+    const where = value("Where");
+    if (where !== undefined) current.where = where;
+    const tests = value("Tests");
+    if (tests !== undefined) current.tests = tests.trim();
+    const gate = value("Gate");
+    if (gate !== undefined) current.gate = gate.trim();
+  }
+  return tasks;
+}
+function phases(lines: string[]) {
+  const out = new Map<string, number>();
+  let phase: number | undefined;
+  for (const line of lines) {
+    const found = /^#{2,4}\s+Phase\s+(\d+)/i.exec(line.trim());
+    if (found) {
+      phase = Number(found[1]);
+      continue;
+    }
+    const task = taskRe.exec(line.trim());
+    if (phase !== undefined && task) out.set(task[1].toUpperCase(), phase);
+  }
+  return out;
+}
+function diagram(lines: string[]) {
+  const edges = new Set<string>();
+  let fence = false,
+    parsed = false;
+  for (const line of lines) {
+    if (line.trim().startsWith("```")) {
+      fence = !fence;
+      continue;
+    }
+    if (!fence || (!line.includes("->") && !line.includes("→"))) continue;
+    const segments = line
+      .replaceAll("→", "->")
+      .split("->")
+      .map((part) => (part.toUpperCase().match(edgeRe) ?? []).at(-1));
+    for (let i = 0; i < segments.length - 1; i += 1)
+      if (segments[i] && segments[i + 1]) {
+        edges.add(`${segments[i]}>${segments[i + 1]}`);
+        parsed = true;
+      }
+  }
+  return { edges, parsed };
+}
+export function check(tasksPath: string) {
+  const lines = fs.readFileSync(tasksPath, "utf8").split(/\r?\n/),
+    errors: string[] = [],
+    warnings: string[] = [];
+  for (const name of required)
+    if (!lines.some((line) => new RegExp(`^#{1,4}\\s+${name}\\b`).test(line.trim())))
+      errors.push(`missing required section: ## ${name}`);
+  const tasks = parseTasks(lines);
+  if (!tasks.size)
+    return {
+      errors,
+      warnings: [...warnings, "no tasks (### T1: ...) parsed - is this file filled in?"],
+    };
+  for (const [id, task] of tasks) {
+    if (task.tests === undefined) errors.push(`${id}: missing \`Tests\` field`);
+    else if (task.tests.toLowerCase().startsWith("none"))
+      warnings.push(
+        `${id}: Tests: none - confirm the Test Coverage Matrix says 'none' for this layer`,
+      );
+    if (task.gate === undefined) errors.push(`${id}: missing \`Gate\` field`);
+    const files = [...new Set(task.where.match(fileRe) ?? [])];
+    if (files.length > 1)
+      warnings.push(
+        `${id}: \`Where\` names multiple files ${JSON.stringify(files.sort()).replaceAll('"', "'")} - granularity smell, consider splitting`,
+      );
+  }
+  const members = phases(lines);
+  for (const [id, task] of tasks)
+    for (const dep of task.deps)
+      if ((members.get(dep) ?? -Infinity) > (members.get(id) ?? Infinity))
+        errors.push(
+          `${id} (phase ${members.get(id)}) depends on ${dep} (phase ${members.get(dep)}) - dependencies must point backward or within the same phase`,
+        );
+  const { edges, parsed } = diagram(lines);
+  if (!parsed)
+    warnings.push(
+      "diagram arrows not parsed confidently - diagram/definition cross-check skipped (verify by hand)",
+    );
+  else {
+    const defs = new Set<string>();
+    for (const [id, task] of tasks) for (const dep of task.deps) defs.add(`${dep}>${id}`);
+    const same = (edge: string) => {
+      const [a, b] = edge.split(">");
+      return !members.has(a) || !members.has(b) || members.get(a) === members.get(b);
+    };
+    for (const edge of [...edges].filter((edge) => !defs.has(edge) && same(edge)).sort()) {
+      const [a, b] = edge.split(">");
+      if (tasks.has(a) && tasks.has(b))
+        errors.push(`diagram shows ${a} -> ${b} but ${b} has no matching \`Depends on: ${a}\``);
+    }
+    for (const edge of [...defs].filter((edge) => !edges.has(edge) && same(edge)).sort()) {
+      const [a, b] = edge.split(">");
+      errors.push(`${b} declares \`Depends on: ${a}\` but the diagram has no ${a} -> ${b} arrow`);
+    }
+  }
+  return { errors, warnings };
+}
+export function main(argv = process.argv.slice(2)): number {
+  let target: string | undefined,
+    root = ".",
+    strict = false;
+  for (let i = 0; i < argv.length; i += 1)
+    if (argv[i] === "--root") root = argv[++i] ?? ".";
+    else if (argv[i] === "--strict") strict = true;
+    else if (!target) target = argv[i];
+    else {
+      console.error("usage: validate_tasks.ts [target] [--root DIR] [--strict]");
+      return 2;
+    }
+  let file: string | undefined;
+  try {
+    file = resolveTasks(target, root);
+  } catch (e) {
+    console.error(e instanceof Error ? e.message : String(e));
+    return 2;
+  }
+  if (!file) {
+    console.error(
+      "validate_tasks: could not locate a tasks.md. Pass a path or run from the project root.",
+    );
+    return 2;
+  }
+  const { errors, warnings } = check(file);
+  warnings.forEach((x) => console.log(`  WARN  ${x}`));
+  errors.forEach((x) => console.log(`  ERROR ${x}`));
+  console.log(
+    `\nvalidate_tasks: ${errors.length} error(s), ${warnings.length} warning(s) in ${file}`,
+  );
+  return errors.length || (strict && warnings.length) ? 1 : 0;
+}
+if (import.meta.url === `file://${process.argv[1]}`) process.exitCode = main();

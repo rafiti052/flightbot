@@ -121,7 +121,7 @@ No raw logs, no full test output - only the above fields keep the main context c
 
 **Failure handling:** The orchestrator routes the ranked gaps to an implementer as fix tasks, then re-dispatches the Verifier. This fix→re-verify loop is bounded to a maximum of **3 iterations**. If gaps remain after 3 iterations, escalate to the user.
 
-**Standalone fallback:** When running without sub-agents (a single agent executing the full feature), run `validate.md` as an independent fresh-eyes pass - re-read `spec.md` and the diff from scratch, apply evidence-or-zero, run the spec-anchored check and discrimination sensor, write the report file, then run `python3 <skill-dir>/scripts/validate_state.py <feature>` to confirm the report is a real PASS, and report PASS/FAIL before marking the feature done.
+**Standalone fallback:** Run `validate.md`, then `pnpm exec tsx <skill-dir>/scripts/validate_state.ts <feature>` before marking the feature done.
 
 ---
 

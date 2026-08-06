@@ -181,11 +181,11 @@ After all checks complete, the Verifier MUST:
 1. **Write the persisted report** to `.specs/features/[feature]/validation.md` (see template below). This file is the evidence artifact - it survives the session and can be referenced by CI, reviewers, or future agents.
 2. **Return a compact summary in chat** to the orchestrator (see Compact Chat Summary section below). The orchestrator surfaces it to the user and routes any ranked gaps to fix tasks.
 
-**Deterministic backing (run it, do not eyeball it).** After writing the report, run `python3 <skill-dir>/scripts/validate_state.py <feature>`. It confirms the report is real - present, verdict filled to PASS, and backed by at least one `file:line` evidence citation - so a missing, hollow, placeholder, or FAIL report cannot slip through as done. A non-zero exit means the feature is NOT done: repair the report or route the FAIL gaps to fix tasks, then re-run. This is the closing gate of Execute and runs automatically, the same way the lessons layer runs at distillation; it is never a manual step. If no code-execution tool is available, confirm the same by reading `validation.md`.
+**Deterministic backing:** after writing the report, run `pnpm exec tsx <skill-dir>/scripts/validate_state.ts <feature>`.
 
 ### 10. Distill Lessons (MANDATORY when validation.md has signal)
 
-This is the closing action of validation - not a separate phase. Immediately after the report is written, turn its grounded failures into reusable, project-local guidance by following [lessons.md](lessons.md). In short: for each surviving mutant, spec-precision gap, failed/uncovered AC, or `// SPEC_DEVIATION`, record one terse general lesson via `python3 <skill-dir>/scripts/lessons.py add` (the script enforces grounding and owns all bookkeeping). A clean PASS with no signal → record nothing. Run the self-check: if there was signal but no lesson was recorded, say so in chat. See [lessons.md](lessons.md) for the exact commands, phrasing rules, scope discipline, and the no-script fallback.
+Record grounded failures via `pnpm exec tsx <skill-dir>/scripts/lessons.ts add`. A clean PASS records nothing.
 
 ---
 
@@ -352,4 +352,4 @@ Update spec.md requirement statuses:
 - **Max 3 diagnostic iterations** - Prevents infinite investigation loops
 - **Update traceability** - Every verified requirement updates spec.md status
 - **Always write the report file** - `.specs/features/[feature]/validation.md` is the persisted evidence artifact
-- **Distill after writing** - turn grounded failures into lessons via `scripts/lessons.py` ([lessons.md](lessons.md)); clean PASS → no lesson
+- **Distill after writing** - turn grounded failures into lessons via `scripts/lessons.ts`; clean PASS records nothing
