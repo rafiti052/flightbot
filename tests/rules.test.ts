@@ -19,7 +19,9 @@ describe("path-scoped agent rules", () => {
         expect(existsSync(resolve(root, path))).toBe(true);
         expect(content).toContain(`  - ${path}`);
       }
-      expect(content).toMatch(/^---\npaths:\n[\s\S]+\nglobs:\n[\s\S]+\n---\n/m);
+      expect(content).toMatch(
+        /^---\ndescription: .+\ntrigger: .+\npaths:\n[\s\S]+\nglobs:\n[\s\S]+\n---\n/m,
+      );
     }
   });
 

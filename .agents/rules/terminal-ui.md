@@ -1,4 +1,6 @@
 ---
+description: Preserve Flightbot terminal formatting and non-TTY output contracts.
+trigger: ui.ts
 paths:
   - ui.ts
 globs:

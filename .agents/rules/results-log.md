@@ -1,4 +1,6 @@
 ---
+description: Preserve the append-only parsed results.log text and JSON contracts.
+trigger: "{bot.ts,scripts/lib/format-status.ts}"
 paths:
   - bot.ts
   - scripts/lib/format-status.ts

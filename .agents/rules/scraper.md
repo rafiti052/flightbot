@@ -1,4 +1,6 @@
 ---
+description: Preserve Flightbot scraper selectors, extraction, and filtering contracts.
+trigger: scraper.ts
 paths:
   - scraper.ts
 globs:
