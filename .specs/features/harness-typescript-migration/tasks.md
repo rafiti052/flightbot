@@ -342,7 +342,7 @@ T18 -> T23
 
 ### T22: Add route-management skill
 
-**Status**: Pending
+**Status**: Complete
 **What**: Add a focused canonical skill for safe route inspection/mutation through the maintained CLI and link supported assistants.
 **Where**: `.agents/skills/route-management/`
 **Depends on**: T12
