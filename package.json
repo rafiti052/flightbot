@@ -2,13 +2,13 @@
   "name": "flight-bot",
   "version": "1.0.0",
   "type": "module",
-  "main": "bot.js",
+  "main": "bot.ts",
   "packageManager": "pnpm@11.5.1",
   "engines": {
     "node": ">=20.19.0"
   },
   "scripts": {
-    "start": "node bot.js",
+    "start": "tsx bot.ts",
     "install-browsers": "pnpm exec playwright install chromium",
     "test": "vitest run",
     "test:watch": "vitest",
