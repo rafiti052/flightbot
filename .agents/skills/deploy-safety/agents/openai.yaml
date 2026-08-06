@@ -1,0 +1,4 @@
+interface:
+  display_name: "Deployment Safety"
+  short_description: "Run deployment checks with explicit human gates"
+  default_prompt: "Use $deploy-safety to assess a Flightbot deployment without making unapproved changes."

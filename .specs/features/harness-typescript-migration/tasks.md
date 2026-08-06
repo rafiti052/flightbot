@@ -355,7 +355,7 @@ T18 -> T23
 
 ### T23: Add deploy-safety skill
 
-**Status**: Pending
+**Status**: Complete
 **What**: Add canonical read-first deploy guidance with explicit human gates and no implicit deployment.
 **Where**: `.agents/skills/deploy-safety/`
 **Depends on**: T18
