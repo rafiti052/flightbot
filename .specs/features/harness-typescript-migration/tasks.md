@@ -368,7 +368,7 @@ T18 -> T23
 
 ### T24: Add scrape-debugger agent
 
-**Status**: Pending
+**Status**: Complete
 **What**: Define a diagnostic-only custom agent with no edit/write tools and mandatory `--no-send` path.
 **Where**: `.claude/agents/scrape-debugger.md`
 **Depends on**: T14
