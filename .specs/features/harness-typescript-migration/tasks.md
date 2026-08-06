@@ -249,7 +249,7 @@ T18 -> T23
 
 ### T15: Add deterministic harness threshold
 
-**Status**: Pending
+**Status**: Complete
 **What**: Run the pinned scanner, parse JSON, and exit non-zero below 70 percent with injectable process execution for tests.
 **Where**: `scripts/check-harness-score.ts`
 **Depends on**: T02
