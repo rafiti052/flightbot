@@ -197,7 +197,7 @@ T18 -> T23
 
 ### T11: Migrate bot runtime
 
-**Status**: Pending
+**Status**: Complete
 **What**: Rename/type bot orchestration, add an import-safe direct-entry guard, and expose injectable test boundaries.
 **Where**: `bot.ts`
 **Depends on**: T03, T04
