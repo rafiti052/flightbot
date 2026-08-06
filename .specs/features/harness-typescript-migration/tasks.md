@@ -329,7 +329,7 @@ T18 -> T23
 
 ### T21: Add path-scoped rules
 
-**Status**: Pending
+**Status**: Complete
 **What**: Define canonical scraper, UI, and parsed-log rules with Claude `paths` and Cursor `globs`, then link all three assistant surfaces.
 **Where**: `.agents/rules/` and agent-specific rule directories
 **Depends on**: T02
