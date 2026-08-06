@@ -12,7 +12,7 @@ A single file with two section-scoped parts. Each section has its own lifecycle;
 
 Records **project-level** decisions only: conventions, patterns, constraints, or cross-cutting technology choices that future features must follow or supersede.
 
-**Not project-level → stays in the feature's `design.md` Tech Decisions table.**  
+**Not project-level → stays in the feature's `design.md` Tech Decisions table.**
 Heuristic: would a different feature need to know about this? If yes → project-level. If no → feature-local.
 
 **Record sparingly - the log stays useful only by staying small.** Even a project-level decision earns an `AD-NNN` entry only when all three hold:

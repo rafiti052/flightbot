@@ -96,7 +96,7 @@ T18 -> T23
 **Where**: `ui.ts`
 **Depends on**: T02
 **Requirement**: HTM-01, HTM-03, HTM-13
-**Owned files**: `ui.js`, `ui.ts`, `tests/ui.test.ts`, owned T03 block
+**Owned files**: `ui.ts`, `tests/ui.test.ts`, owned T03 block; removed predecessor
 **Done when**: ANSI/color decisions, Unicode width, truncation, tables, money, duration, status, and non-TTY progress are covered and compatible.
 **Tests**: unit
 **Gate**: focused TypeScript
@@ -109,7 +109,7 @@ T18 -> T23
 **Where**: `scraper.ts`
 **Depends on**: T02
 **Requirement**: HTM-01, HTM-03, HTM-13
-**Owned files**: `scraper.js`, `scraper.ts`, `tests/scraper.test.ts`, owned T04 block
+**Owned files**: `scraper.ts`, `tests/scraper.test.ts`, owned T04 block; removed predecessor
 **Done when**: URL, duration, filtering, Claude response, selector, prompt, delay, and timeout behavior is covered without external calls.
 **Tests**: unit with injected browser/client
 **Gate**: focused TypeScript
@@ -202,7 +202,7 @@ T18 -> T23
 **Where**: `bot.ts`
 **Depends on**: T03, T04
 **Requirement**: HTM-01, HTM-03, HTM-13
-**Owned files**: `bot.js`, `bot.ts`, `tests/bot.test.ts`, owned T11 block
+**Owned files**: `bot.ts`, `tests/bot.test.ts`, owned T11 block; removed predecessor
 **Done when**: All alert, flex-date, lock, error, state-transition, schedule, rate-limit, and stable-log branches pass without external calls.
 **Tests**: unit/integration with temp state
 **Gate**: focused TypeScript

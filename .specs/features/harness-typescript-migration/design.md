@@ -26,9 +26,9 @@ graph TD
 
 | Existing component | Location | How it is reused |
 | --- | --- | --- |
-| Alert/run orchestration | `bot.js` | Rename and type without changing branches or persistence semantics. |
-| Scrape pipeline | `scraper.js` | Preserve exports, selectors, prompt, delays, and post-extraction filters. |
-| Terminal semantics | `ui.js` | Preserve public formatters, glyph behavior, ANSI policy, and non-TTY logs. |
+| Alert/run orchestration | root bot runtime (legacy source removed) | Type without changing branches or persistence semantics. |
+| Scrape pipeline | root scraper runtime (legacy source removed) | Preserve exports, selectors, prompt, delays, and post-extraction filters. |
+| Terminal semantics | root terminal helpers (legacy source removed) | Preserve public formatters, glyph behavior, ANSI policy, and non-TTY logs. |
 | Operational CLI contracts | `scripts/` | Split pure/testable functions from direct-entry wrappers. |
 | TLC validators | `.agents/skills/tlc-spec-driven/scripts/*.py` | Port algorithms and exact observable contracts before deleting each predecessor. |
 
@@ -108,9 +108,9 @@ graph TD
 
 | Concern | Location | Impact | Mitigation |
 | --- | --- | --- | --- |
-| Import-time bot side effects | `bot.js` | Unit tests could schedule or call external systems. | Add an explicit direct-entry guard before tests import the module. |
-| Large implicit runtime shapes | `bot.js`, `scraper.js` | Strict migration may hide unsafe casts. | Centralize domain types and narrow untrusted JSON/content. |
-| Public log text is parsed | `bot.js`, `scripts/lib/format-status.js` | Cosmetic edits could break operations. | Snapshot focused public records and preserve non-TTY text. |
+| Import-time bot side effects | `bot.ts` | Unit tests could schedule or call external systems. | Add an explicit direct-entry guard before tests import the module. |
+| Large implicit runtime shapes | `bot.ts`, `scraper.ts` | Strict migration may hide unsafe casts. | Centralize domain types and narrow untrusted JSON/content. |
+| Public log text is parsed | `bot.ts`, `scripts/lib/format-status.ts` | Cosmetic edits could break operations. | Snapshot focused public records and preserve non-TTY text. |
 | Python parity is broad | TLC scripts | A straight rewrite could drift on stream/exit/mutation details. | Run both implementations against fixture corpora before deleting Python. |
 | Parallel task file conflicts | `tasks.md` | Cherry-picks may conflict. | Each worker edits only its owned task blocks; orchestrator owns integration. |
 
