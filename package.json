@@ -4,13 +4,41 @@
   "type": "module",
   "main": "bot.js",
   "packageManager": "pnpm@11.5.1",
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "scripts": {
     "start": "node bot.js",
-    "install-browsers": "pnpm exec playwright install chromium"
+    "install-browsers": "pnpm exec playwright install chromium",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "pnpm run test && pnpm run typecheck && pnpm run lint && pnpm run format:check",
+    "harness:score": "harness-score --json",
+    "harness:check": "tsx scripts/check-harness-score.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.85.0",
     "node-cron": "^3.0.3",
-    "playwright": "~1.62.1"
+    "playwright": "~1.62.1",
+    "tsx": "^4.23.9"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "22.20.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "eslint": "^10.8.0",
+    "eslint-config-prettier": "^10.1.8",
+    "harness-score": "1.5.2",
+    "lefthook": "^2.1.10",
+    "prettier": "^3.9.6",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.66.0",
+    "vitest": "^4.1.10"
   }
 }

@@ -33,6 +33,8 @@
 | Git hooks | `lefthook ^2.1.10` |
 | Sensor | `harness-score 1.5.2` |
 
+**Verified pnpm 11.5.1 adjustment:** this release ignores `package.json#pnpm.onlyBuiltDependencies` and uses repository-level `pnpm-workspace.yaml#allowBuilds`. The equivalent allowlist is therefore committed there for `esbuild` and `lefthook`; the generated `minimumReleaseAgeExclude` entry pins the explicitly approved `tsx@4.23.9` through the active supply-chain policy.
+
 ## Safety Boundaries
 
 - Do not deploy, push, open a PR, call Telegram, or mutate EC2.

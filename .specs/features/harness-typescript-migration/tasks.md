@@ -76,7 +76,7 @@ T18 -> T23
 
 ### T02: Establish TypeScript quality toolchain
 
-**Status**: Pending
+**Status**: Complete
 **What**: Add locked dependencies, package scripts, strict compiler config, shared types, Vitest, ESLint, and Prettier foundations without switching runtime entrypoints.
 **Where**: package and root tooling files
 **Depends on**: T01

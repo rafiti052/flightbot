@@ -1,0 +1,16 @@
+node_modules/
+coverage/
+.git/
+.specs/
+.agents/skills/tlc-spec-driven/references/
+*.md
+pnpm-lock.yaml
+bot.js
+scraper.js
+ui.js
+scripts/**/*.js
+.agents/skills/tlc-spec-driven/scripts/**/*.py
+config.json
+prices.json
+results.log
+*.png
