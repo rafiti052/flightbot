@@ -85,6 +85,18 @@ describe("status formatter contract", () => {
     expect(output).toContain("scrape failed  (GRU → JFK, 30s ago)");
   });
 
+  it("renders a completed run as degraded when that run contains an issue", () => {
+    const output = render({
+      CONTAINER: "flightbot\tUp",
+      RUNS: "[2026-08-06T11:58:00Z] === Bot run started ===\n[2026-08-06T11:59:00Z] === Bot run complete ===",
+      ISSUE_COUNT: "1",
+      ISSUES: "[2026-08-06T11:58:30Z] [GRU → JFK] extraction failed",
+    });
+
+    expect(output).toContain("DEGRADED        last run 1m ago");
+    expect(output).toContain("extraction failed  (GRU → JFK, 2m ago)");
+  });
+
   it("renders down containers, budgets, inactive routes, and BEST fallback", () => {
     const output = render({
       CONTAINER: "flightbot\tExited (1)",
