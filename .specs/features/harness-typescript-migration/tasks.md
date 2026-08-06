@@ -104,7 +104,7 @@ T18 -> T23
 
 ### T04: Migrate scraper pipeline
 
-**Status**: Pending
+**Status**: Complete
 **What**: Rename/type the scraper, preserve five exports and external contracts, and explicitly reject responses without a text block.
 **Where**: `scraper.ts`
 **Depends on**: T02
