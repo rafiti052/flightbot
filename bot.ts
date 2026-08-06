@@ -59,6 +59,129 @@ function formatError(error: unknown): string {
 function firstErrorLine(error: unknown): string {
   return errorMessage(error).split("\n", 1)[0];
 }
+function scheduleLabel(schedule: string): string {
+  const match = schedule.match(/^0 ([\d,]+) \* \* \*$/);
+  if (!match) return schedule;
+  return `every day at ${match[1]
+    .split(",")
+    .map((hour) => String(Number(hour)).padStart(2, "0"))
+    .join(", ")}`;
+}
+let viewRouteWidth = 0;
+function routeLabel(route: Route): string {
+  return `${route.name}${" ".repeat(Math.max(0, viewRouteWidth - ui.displayWidth(route.name)))}`;
+}
+function createView(log: Logger, now: Clock) {
+  const routeLog = (route: Route, message: string): void =>
+    log(`[${route.name}]${String(message).startsWith(" ") ? "" : " "}${message}`);
+  return {
+    boot(config: RuntimeConfig): void {
+      log(`Bot started. Schedule: ${config.schedule}`);
+      if (!ui.isTty) return;
+      const active = config.routes.filter((route) => route.active);
+      viewRouteWidth = Math.max(0, ...active.map((route) => ui.displayWidth(route.name)));
+      console.log(
+        ui.title(
+          "flightbot",
+          `${active.length} route${active.length === 1 ? "" : "s"} ${ui.glyph.dot} ${scheduleLabel(config.schedule)}`,
+        ),
+      );
+      console.log();
+    },
+    runStart(): void {
+      log("=== Bot run started ===");
+      if (ui.isTty) {
+        console.log(
+          ui.c.dim(`run ${new Date(now()).toLocaleTimeString("en-GB", { hour12: false })}`),
+        );
+        console.log(ui.rule());
+      }
+    },
+    routeStart(route: Route): void {
+      log(`[${route.name}] Checking...`);
+      if (ui.isTty) console.log(`${routeLabel(route)}  ${ui.c.dim("checking")}`);
+    },
+    routeProgress(route: Route, message: string, logMessage = message): void {
+      routeLog(route, logMessage);
+      if (ui.isTty) {
+        const prefix = `${routeLabel(route)}  `;
+        console.log(prefix + ui.c.dim(ui.truncate(message, ui.width() - ui.displayWidth(prefix))));
+      }
+    },
+    routeOk(route: Route, count: number, best: Flight): void {
+      log(`[${route.name}] Best price: ${best.price}`);
+      if (!ui.isTty) return;
+      const parts = [
+        `${count} flight${count === 1 ? "" : "s"}`,
+        `best ${ui.money(best.price, route.currency ?? "USD")}`,
+      ];
+      if (route.maxBudget !== null && route.maxBudget !== undefined)
+        parts.push(`budget ${ui.money(route.maxBudget, route.currency ?? "USD")}`);
+      console.log(`${routeLabel(route)}  ${ui.status("ok", parts.join(` ${ui.glyph.dot} `))}`);
+    },
+    routeErr(route: Route, logMessage: string, error: unknown = logMessage): void {
+      routeLog(route, logMessage);
+      if (ui.isTty)
+        console.log(
+          `${routeLabel(route)}  ${ui.status("err", firstErrorLine(error))}${ui.c.dim(" (stack in results.log)")}`,
+        );
+    },
+    alert(route: Route, alertType: AlertType): void {
+      log("Telegram alert sent successfully");
+      if (ui.isTty)
+        console.log(`${routeLabel(route)}  ${ui.status("alert", `alert sent (${alertType})`)}`);
+    },
+    runtimeErr(message: string, error: unknown): void {
+      log(message);
+      if (ui.isTty) console.error(ui.status("err", firstErrorLine(error)));
+    },
+    runEnd(startedAt: number, outcomes: RunOutcome[]): void {
+      log("=== Bot run complete ===");
+      if (!ui.isTty) return;
+      const alerts = outcomes.filter((outcome) => outcome.alertType).length;
+      const errors = outcomes.filter((outcome) => outcome.error).length;
+      const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
+      const rows = outcomes.map((outcome) => {
+        let delta = "—";
+        if (outcome.best !== null && outcome.prevPrice !== null) {
+          const difference = outcome.best - outcome.prevPrice;
+          delta =
+            difference < 0
+              ? `${ui.glyph.down} ${Math.abs(difference).toLocaleString("pt-BR")}`
+              : difference > 0
+                ? `${ui.glyph.up} ${difference.toLocaleString("pt-BR")}`
+                : "— 0";
+        }
+        return {
+          route: outcome.route.name,
+          best: ui.money(outcome.best, outcome.route.currency ?? "USD"),
+          budget: ui.money(outcome.budget, outcome.route.currency ?? "USD"),
+          delta,
+          status: outcome.error ? "error" : outcome.alertType ? "alerted" : "silent",
+        };
+      });
+      console.log(ui.rule());
+      console.log(
+        `done in ${ui.dur(now() - startedAt)} ${ui.glyph.dot} ${plural(alerts, "alert")} ${ui.glyph.dot} ${plural(errors, "error")}`,
+      );
+      if (rows.length > 0) {
+        console.log();
+        console.log(
+          ui.table(
+            [
+              { key: "route", header: "route" },
+              { key: "best", header: "best", align: "right" },
+              { key: "budget", header: "budget", align: "right" },
+              { key: "delta", header: "Δ last", align: "right" },
+              { key: "status", header: "status" },
+            ],
+            rows,
+          ),
+        );
+      }
+    },
+  };
+}
 
 export function loadConfig(options: BotOptions = {}): RuntimeConfig {
   const configPath = options.configPath ?? defaults.configPath;
@@ -262,36 +385,46 @@ export async function run(config: RuntimeConfig, options: BotOptions = {}): Prom
     options.send ?? ((token, chat, message) => sendTelegram(token, chat, message, deps.baseLog));
   const prices = deps.loadPrices();
   const outcomes: RunOutcome[] = [];
-  deps.baseLog("=== Bot run started ===");
+  const view = createView(deps.baseLog, deps.now);
+  const startedAt = deps.now();
+  view.runStart();
   for (const route of config.routes) {
     if (!route.active) {
       deps.baseLog(`[${route.name}] Skipped (inactive)`);
       continue;
     }
-    deps.baseLog(`[${route.name}] Checking...`);
+    view.routeStart(route);
     const results: Flight[] = [];
     let routeError: unknown | null = null;
     for (const variant of dateVariants(route)) {
       const label = variant._dateLabel ? ` (${variant._dateLabel})` : "";
-      deps.baseLog(`[${route.name}]${label} Scraping...`);
+      view.routeProgress(
+        route,
+        `${label.trimStart()} Scraping...`.trimStart(),
+        `${label} Scraping...`,
+      );
       try {
         const flights = await scrape(variant, config.anthropic.apiKey, (message) =>
-          deps.baseLog(`[${route.name}] ${message}`),
+          view.routeProgress(route, message),
         );
         flights.forEach((flight) => {
           flight._variant = variant;
         });
         results.push(...flights);
-        deps.baseLog(`[${route.name}]${label} Found ${flights.length} result(s)`);
+        view.routeProgress(
+          route,
+          `${label.trimStart()} Found ${flights.length} result(s)`.trimStart(),
+          `${label} Found ${flights.length} result(s)`,
+        );
       } catch (error) {
         routeError ??= error;
-        deps.baseLog(`[${route.name}]${label} Scrape error: ${errorMessage(error)}`);
+        view.routeErr(route, `${label} Scrape error: ${errorMessage(error)}`, error);
       }
       await sleep(3000 + random() * 3000);
     }
     if (results.length === 0) {
       const error = routeError ?? new Error("No results across all date variants");
-      deps.baseLog(`[${route.name}] No results across all date variants, skipping`);
+      view.routeErr(route, "No results across all date variants, skipping", error);
       outcomes.push({
         route,
         best: null,
@@ -305,7 +438,7 @@ export async function run(config: RuntimeConfig, options: BotOptions = {}): Prom
     results.sort((left, right) => (left.price ?? Infinity) - (right.price ?? Infinity));
     const best = results[0];
     if (best.price === null) continue;
-    deps.baseLog(`[${route.name}] Best price: ${best.price}`);
+    view.routeOk(route, results.length, best);
     const state = prices[route.name];
     const prevPrice = state?.lastSeenPrice ?? null;
     const alertType = evaluateAlert(route, best, state);
@@ -328,7 +461,7 @@ export async function run(config: RuntimeConfig, options: BotOptions = {}): Prom
           formatMessage(best._variant ?? route, best, alertType),
         )
       )
-        deps.baseLog("Telegram alert sent successfully");
+        view.alert(route, alertType);
     } else {
       deps.baseLog(
         `[${route.name}] No alert (price: ${best.price}, lastAlertPrice: ${state?.lastAlertPrice ?? "none"})`,
@@ -346,7 +479,7 @@ export async function run(config: RuntimeConfig, options: BotOptions = {}): Prom
     });
     if (route !== config.routes.filter((item) => item.active).at(-1)) await sleep(5000);
   }
-  deps.baseLog("=== Bot run complete ===");
+  view.runEnd(startedAt, outcomes);
   return outcomes;
 }
 
@@ -357,7 +490,9 @@ export async function runWithLock(
   options: BotOptions = {},
 ): Promise<void> {
   const now = (options.now ?? Date.now)();
-  const log = runtime(options).baseLog;
+  const deps = runtime(options);
+  const view = createView(deps.baseLog, deps.now);
+  const log = deps.baseLog;
   if (runState.inProgress && now - runState.startedAt < RUN_LOCK_STALE_MS) {
     log(
       `Skipping ${trigger} run because another run is still active (${Math.round((now - runState.startedAt) / 1000)}s old)`,
@@ -372,7 +507,10 @@ export async function runWithLock(
   try {
     await run(config, options);
   } catch (error) {
-    log(`${trigger === "startup" ? "Initial" : "Scheduled"} run failed: ${formatError(error)}`);
+    view.runtimeErr(
+      `${trigger === "startup" ? "Initial" : "Scheduled"} run failed: ${formatError(error)}`,
+      error,
+    );
   } finally {
     runState = { inProgress: false, startedAt: 0 };
   }
@@ -392,15 +530,21 @@ export function main(options: BotOptions = {}): void {
     process.exitCode = 1;
     return;
   }
-  runtime(options).baseLog(`Bot started. Schedule: ${config.schedule}`);
+  createView(runtime(options).baseLog, options.now ?? Date.now).boot(config);
   (options.schedule ?? cron.schedule)(config.schedule, () => {
     void runWithLock(loadConfig(options), "schedule", options);
   });
   process.on("unhandledRejection", (reason) =>
-    runtime(options).baseLog(`Unhandled rejection: ${formatError(reason)}`),
+    createView(runtime(options).baseLog, options.now ?? Date.now).runtimeErr(
+      `Unhandled rejection: ${formatError(reason)}`,
+      reason,
+    ),
   );
   process.on("uncaughtException", (error) =>
-    runtime(options).baseLog(`Uncaught exception: ${formatError(error)}`),
+    createView(runtime(options).baseLog, options.now ?? Date.now).runtimeErr(
+      `Uncaught exception: ${formatError(error)}`,
+      error,
+    ),
   );
   void runWithLock(config, "startup", options);
 }

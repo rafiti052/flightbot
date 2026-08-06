@@ -191,4 +191,39 @@ describe("bot runtime contracts", () => {
     expect(schedule).toHaveBeenCalledWith("0 9 * * *", expect.any(Function));
     expect(deps.log).toHaveBeenCalledWith("Bot started. Schedule: 0 9 * * *");
   });
+
+  it("renders the preserved TTY boot, route, alert, error, and run-summary views", async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
+    Object.defineProperty(process.stdout, "isTTY", { configurable: true, value: true });
+    vi.resetModules();
+    const ttyBot = await import("../bot.ts");
+    const output = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const deps = runtime();
+    await ttyBot.run(config, deps);
+    await ttyBot.run(
+      { ...config, routes: [{ ...route, name: "FAILED" }] },
+      runtime(vi.fn().mockRejectedValue(new Error("scrape failed"))),
+    );
+    ttyBot.main({
+      ...runtime(),
+      loadEnvFile: vi.fn(),
+      schedule: vi.fn(),
+      exists: () => true,
+      readFile: () => JSON.stringify({ schedule: "0 9 * * *", routes: [route] }),
+      env: { ANTHROPIC_KEY: "a", TELEGRAM_KEY: "t", TELEGRAM_CHAT_ID: "c" },
+    });
+    const rendered = output.mock.calls.map(([line]) => String(line)).join("\n");
+    expect(rendered).toContain("checking");
+    expect(rendered).toContain("✓ 1 flight");
+    expect(rendered).toContain("▲ alert sent (first)");
+    expect(rendered).toContain("✗ scrape failed (stack in results.log)");
+    expect(rendered).toContain("done in 0s · 1 alert · 0 errors");
+    expect(rendered).toContain("flightbot  1 route · every day at 09");
+    expect(errors).not.toHaveBeenCalled();
+    output.mockRestore();
+    errors.mockRestore();
+    if (descriptor) Object.defineProperty(process.stdout, "isTTY", descriptor);
+    else delete (process.stdout as { isTTY?: boolean }).isTTY;
+  });
 });
