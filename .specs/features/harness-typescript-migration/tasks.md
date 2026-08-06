@@ -383,7 +383,7 @@ T18 -> T23
 
 ### T25: Add deterministic CI
 
-**Status**: Pending
+**Status**: Complete
 **What**: Add least-privilege GitHub Actions on Node 22/pnpm 11.5.1 with frozen install and every repository gate.
 **Where**: `.github/workflows/ci.yml`
 **Depends on**: T15, T18, T20
