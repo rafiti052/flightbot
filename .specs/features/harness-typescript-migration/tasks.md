@@ -143,7 +143,7 @@ T18 -> T23
 
 ### T07: Migrate state validator
 
-**Status**: Pending
+**Status**: Complete
 **What**: Port state/validation report checks with identical feature resolution and evidence rules.
 **Where**: `.agents/skills/tlc-spec-driven/scripts/validate_state.ts`
 **Depends on**: T02
