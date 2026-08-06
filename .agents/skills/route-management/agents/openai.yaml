@@ -1,0 +1,4 @@
+interface:
+  display_name: "Route Management"
+  short_description: "Safely inspect and manage monitored routes"
+  default_prompt: "Use $route-management to inspect or safely update a flight monitor route."
