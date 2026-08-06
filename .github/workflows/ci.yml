@@ -29,6 +29,7 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run check
+      - name: Test, typecheck, lint, and format
+        run: pnpm run check
       - run: pnpm run harness:check
       - run: git ls-files '*.sh' | xargs -r bash -n
