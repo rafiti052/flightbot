@@ -10,13 +10,17 @@ case "$file_path" in
   *) exit 0 ;;
 esac
 
-repo_root="${CLAUDE_PROJECT_DIR:-$PWD}"
+repo_root="$(cd "${CLAUDE_PROJECT_DIR:-$PWD}" && pwd -P)"
+if [[ "$file_path" != /* ]]; then
+  file_path="$repo_root/$file_path"
+fi
+
+[[ -f "$file_path" ]] || exit 0
+file_path="$(cd "$(dirname "$file_path")" && pwd -P)/$(basename "$file_path")"
 case "$file_path" in
   "$repo_root"/*) ;;
   *) exit 0 ;;
 esac
-
-[[ -f "$file_path" ]] || exit 0
 
 pnpm exec prettier --write "$file_path" >/dev/null 2>&1 || true
 pnpm exec eslint --fix "$file_path" >/dev/null 2>&1 || true
