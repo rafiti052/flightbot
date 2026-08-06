@@ -4,15 +4,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: [
-      "node_modules/**",
-      "coverage/**",
-      "bot.js",
-      "scraper.js",
-      "ui.js",
-      "scripts/**/*.js",
-      ".agents/skills/tlc-spec-driven/scripts/**/*.py",
-    ],
+    ignores: ["node_modules/**", "coverage/**"],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,

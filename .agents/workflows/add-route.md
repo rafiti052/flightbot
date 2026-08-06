@@ -2,12 +2,12 @@ Add a new flight route to the flightbot monitor based on: $ARGUMENTS
 
 Example: `/add-route GRU to JFK round trip Sep 10 return Sep 20 budget 4000 BRL max 1 stop`
 
-Your job is to parse intent; `scripts/config-route.js` performs the mutation.
+Your job is to parse intent; `scripts/config-route.ts` performs the mutation.
 
 1. Inspect current routes:
 
    ```
-   node scripts/config-route.js list
+   pnpm exec tsx scripts/config-route.ts list
    ```
 
 2. Parse $ARGUMENTS into flags. Convert all dates to `YYYY-MM-DD`, resolving relative dates against the current date:
@@ -29,7 +29,7 @@ Your job is to parse intent; `scripts/config-route.js` performs the mutation.
 3. Show the exact command you intend to run and ask for confirmation:
 
    ```
-   node scripts/config-route.js add --from GRU --to JFK \
+   pnpm exec tsx scripts/config-route.ts add --from GRU --to JFK \
      --depart 2026-09-10 --return 2026-09-20 --budget 4000 --stops 1
    ```
 

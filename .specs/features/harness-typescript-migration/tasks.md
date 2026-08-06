@@ -303,7 +303,7 @@ T18 -> T23
 
 ### T19: Document TypeScript operations
 
-**Status**: Pending
+**Status**: Complete
 **What**: Update canonical workflows, README, AGENTS, and troubleshooting references to TypeScript and Node `>=20.19`.
 **Where**: repository docs and `.agents/workflows/`
 **Depends on**: T16, T17, T18

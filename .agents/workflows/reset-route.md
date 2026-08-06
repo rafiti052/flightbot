@@ -1,13 +1,13 @@
 Reset or pause a flightbot route based on: $ARGUMENTS
 
-Interpret the intent, then delegate the mutation to `scripts/config-route.js`:
+Interpret the intent, then delegate the mutation to `scripts/config-route.ts`:
 
 | Intent | Command |
 |--------|---------|
-| "reset X" / "clear X" | `node scripts/config-route.js reset "X"` — clears price history so the next scrape treats it as fresh |
-| "pause X" / "disable X" | `node scripts/config-route.js pause "X"` |
-| "resume X" / "enable X" | `node scripts/config-route.js resume "X"` |
-| empty / "all" | `node scripts/config-route.js list`, show the table, then ask what to do |
+| "reset X" / "clear X" | `pnpm exec tsx scripts/config-route.ts reset "X"` — clears price history so the next scrape treats it as fresh |
+| "pause X" / "disable X" | `pnpm exec tsx scripts/config-route.ts pause "X"` |
+| "resume X" / "enable X" | `pnpm exec tsx scripts/config-route.ts resume "X"` |
+| empty / "all" | `pnpm exec tsx scripts/config-route.ts list`, show the table, then ask what to do |
 
 All paths are relative to the repo root.
 
