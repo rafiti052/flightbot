@@ -156,6 +156,9 @@ docker-compose up -d
 
 Deterministic scripts in `scripts/` back the operational workflows in `.agents/workflows/` (exposed as slash commands via symlinks in `.claude/commands/` and `.cursor/commands/`) and are usable directly. Shell scripts read the `SSH_*` vars from `.env` and exit non-zero on failure.
 
+Reusable agent skills follow the same layout: `.agents/skills/` is canonical, while supported
+agent-specific skill directories contain relative symlinks to it.
+
 | Script | Purpose |
 |--------|---------|
 | `scripts/test-scrape.js ["Route"]` | Full local smoke test; saves `test-screenshot.png` and sends a `[TEST]` alert |

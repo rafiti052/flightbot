@@ -15,3 +15,6 @@ node_modules/
 # agentic assistant local state; .agents/ is canonical and .claude/.cursor hold
 # committed symlinks into it
 .claude/settings.local.json
+
+# locally downloaded skill metadata is machine-specific
+.agents/skills/**/.skill-meta.json

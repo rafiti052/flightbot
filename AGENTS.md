@@ -75,6 +75,12 @@ Canonical definitions live in `.agents/workflows/`. Claude Code and Cursor expos
 commands via symlinks in `.claude/commands/` and `.cursor/commands/`. Other tools should read
 the workflow file directly and run the `scripts/` command it names.
 
+## Agent skills
+
+Canonical skill definitions live in `.agents/skills/`. Agent-specific skill directories expose
+them through relative symlinks; never maintain copied skill trees under `.claude/`, `.cursor/`,
+or `.windsurf/`.
+
 ## Terminal output
 
 - `ui.js` owns the terminal design roles, glyph fallbacks, width-aware tables, money and
