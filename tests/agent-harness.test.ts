@@ -60,8 +60,6 @@ describe("agent harness contracts", () => {
       expect(agent).toContain(policy);
     const link = path.join(root, ".windsurf/skills/tlc-spec-driven/SKILL.md");
     expect(fs.lstatSync(link).isSymbolicLink()).toBe(true);
-    expect(fs.realpathSync(link)).toBe(
-      path.join(root, ".agents/skills/tlc-spec-driven/SKILL.md"),
-    );
+    expect(fs.realpathSync(link)).toBe(path.join(root, ".agents/skills/tlc-spec-driven/SKILL.md"));
   });
 });
