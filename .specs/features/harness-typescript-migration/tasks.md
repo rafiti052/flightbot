@@ -264,7 +264,7 @@ T18 -> T23
 
 ### T16: Switch runtime package entrypoint
 
-**Status**: Pending
+**Status**: Complete
 **What**: Point package `main` and `start` at `bot.ts` through `tsx` without emission.
 **Where**: `package.json`
 **Depends on**: T11
