@@ -38,9 +38,13 @@ describe("Claude hooks", () => {
   it("asks before deployment and Docker removal or shutdown", () => {
     for (const command of [
       "scripts/deploy.sh",
+      "./scripts/deploy.sh",
+      "bash scripts/deploy.sh",
+      "bash ./scripts/deploy.sh",
       "pnpm run deploy",
       "docker rm container",
       "docker compose down",
+      "docker-compose down",
     ]) {
       expect(preDecision(command).permissionDecision).toBe("ask");
     }
@@ -79,6 +83,14 @@ describe("Claude hooks", () => {
       },
     );
     expect(repairFailure.status).toBe(0);
+    const relativeCodePath = runHook(
+      postHook,
+      JSON.stringify({ tool_input: { file_path: "bot.ts" } }),
+      {
+        PATH: `${bin}:/opt/homebrew/bin:/bin:/usr/bin`,
+      },
+    );
+    expect(relativeCodePath.status).toBe(0);
   });
 
   it("keeps hook scripts executable", () => {

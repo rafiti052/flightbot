@@ -23,9 +23,9 @@ elif is_direct_command git && [[ "$command" =~ git[[:space:]]+reset[[:space:]]+[
   emit_decision deny "Hard git resets are blocked."
 elif is_direct_command git && [[ "$command" =~ git[[:space:]]+push([[:space:]]+[^\;\&\|]*)?[[:space:]]+(-f|--force|--force-with-lease)([[:space:]]|$) ]]; then
   emit_decision deny "Force pushes are blocked."
-elif is_direct_command scripts/deploy.sh || [[ "$command" =~ (^|[\;\&\|])[[:space:]]*(pnpm|npm)[[:space:]]+run[[:space:]]+deploy([[:space:]]|$) ]]; then
+elif [[ "$command" =~ (^|[\;\&\|])[[:space:]]*((bash|sh)[[:space:]]+)?(\./)?scripts/deploy\.sh([[:space:]]|$) ]] || [[ "$command" =~ (^|[\;\&\|])[[:space:]]*(pnpm|npm)[[:space:]]+run[[:space:]]+deploy([[:space:]]|$) ]]; then
   emit_decision ask "Deployment requires explicit confirmation."
-elif is_direct_command docker && { [[ "$command" =~ docker[[:space:]]+(rm|rmi|system[[:space:]]+prune|volume[[:space:]]+rm)([[:space:]]|$) ]] || [[ "$command" =~ docker(-compose|[[:space:]]+compose)[[:space:]]+down([[:space:]]|$) ]]; }; then
+elif { is_direct_command docker && [[ "$command" =~ docker[[:space:]]+(rm|rmi|system[[:space:]]+prune|volume[[:space:]]+rm|compose[[:space:]]+down)([[:space:]]|$) ]]; } || { is_direct_command docker-compose && [[ "$command" =~ docker-compose[[:space:]]+down([[:space:]]|$) ]]; }; then
   emit_decision ask "Docker cleanup or shutdown requires explicit confirmation."
 else
   emit_decision allow "Command is not covered by a safety guard."
