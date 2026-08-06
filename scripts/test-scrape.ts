@@ -1,10 +1,10 @@
 /**
  * Smoke test: scrapes one active route using Claude vision and optionally sends
- * a Telegram message. It shares the production scrape path in scraper.js.
+ * a Telegram message. It shares the production scrape path in scraper.ts.
  *
- * Local:      node scripts/test-scrape.js ["Route Name"] [--no-send] [-v]
- * Structured: node scripts/test-scrape.js ["Route Name"] --json [--no-send]
- * Container:  docker exec flightbot node scripts/test-scrape.js --json
+ * Local:      pnpm exec tsx scripts/test-scrape.ts ["Route Name"] [--no-send] [-v]
+ * Structured: pnpm exec tsx scripts/test-scrape.ts ["Route Name"] --json [--no-send]
+ * Container:  docker exec flightbot pnpm exec tsx scripts/test-scrape.ts --json
  */
 
 import fs from "fs";
