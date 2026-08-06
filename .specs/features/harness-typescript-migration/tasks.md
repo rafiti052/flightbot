@@ -91,7 +91,7 @@ T18 -> T23
 
 ### T03: Migrate terminal UI
 
-**Status**: Pending
+**Status**: Complete
 **What**: Rename and strictly type terminal helpers without changing visual or non-TTY contracts.
 **Where**: `ui.ts`
 **Depends on**: T02
