@@ -16,7 +16,7 @@ case "${1:-}" in
   *)          die "usage: $(basename "$0") [--no-cache]" ;;
 esac
 
-SYNC_FILES=(bot.js scraper.js ui.js Dockerfile docker-compose.yml package.json pnpm-lock.yaml)
+SYNC_FILES=(bot.ts scraper.ts ui.ts types.ts Dockerfile .dockerignore docker-compose.yml package.json pnpm-lock.yaml pnpm-workspace.yaml)
 DEPLOY_STARTED_AT="$(date +%s)"
 
 step "1/4 Syncing code to ${SSH_HOST}:${REMOTE_DIR}"
