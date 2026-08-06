@@ -65,7 +65,7 @@ Before sampling tests or inferring anything, scan the project for documented qua
 **How to infer (path 1 - existing tests):**
 
 1. **Sample test files.** Locate 5-10 existing test files. Map each file's location relative to its source file to identify which code layers are exercised and at what level (unit, integration, e2e). Use these samples for style, location patterns, framework, and test type - and as a **floor** (never produce tests less thorough than existing ones for the same layer). Existing tests are NOT a ceiling on thoroughness; the thoroughness target comes from the spec ACs, listed edge cases, and guidelines (or strong default). The Coverage Expectation column captures the target per layer.
-2. **Discover commands from the repo.** Do NOT invent commands and do NOT assume an ecosystem. Read the project's own build/task manifests, test config, and CI workflows to extract the actual commands - for example: `package.json` / `project.json` (JS/TS), `Makefile`, `pyproject.toml` / `tox.ini` / `pytest` (Python), `Cargo.toml` (Rust), `go test` invocations (Go), `pom.xml` / `build.gradle` (Java/Kotlin), `Gemfile` / `Rakefile` (Ruby), `composer.json` (PHP), `.github/workflows` / `.gitlab-ci.yml`. The list is illustrative; detect what this repo actually uses. Capture the **linter/formatter** command too (e.g. the configured `lint`/`format`/`typecheck` script, or a `.pre-commit-config`, `.golangci.yml`, `ruff`/`eslint`/`biome` config) - the Build gate runs it alongside the tests.
+2. **Discover commands from the repo.** Read the project's manifests, test configuration, and CI workflows to extract actual commands.
 
 **Output contract - render these two sections verbatim into `tasks.md`** (the exact headings downstream phases reference):
 
@@ -146,7 +146,7 @@ This keeps phase boundaries meaningful while letting the packing hit its target 
 
 Before showing tasks to the user, run ALL three pre-approval checks. These are NOT optional - they are gates. If any check fails, restructure the tasks and re-run until all pass.
 
-**Deterministic backing (run it, do not eyeball it).** `python3 <skill-dir>/scripts/validate_tasks.py <tasks-path-or-feature>` enforces the structural half of these checks so they cannot drift: it flags a `Where` that names multiple files (granularity smell, Check 1), a diagram edge with no matching `Depends on` within a phase and vice-versa (Check 2), a task missing its `Tests` or `Gate` field, a `Tests: none` to confirm against the matrix (Check 3), and any dependency pointing to a later phase. A non-zero exit means restructure before presenting. The script checks structure; you still build the two tables below (the layer-to-test co-location judgment is yours). If no code-execution tool is available, run the checks by reading `tasks.md`.
+**Deterministic backing:** `pnpm exec tsx <skill-dir>/scripts/validate_tasks.ts <tasks-path-or-feature>` enforces the structural checks.
 
 **Check 1: Task Granularity** - verify each task is atomic (see Granularity Check section).
 

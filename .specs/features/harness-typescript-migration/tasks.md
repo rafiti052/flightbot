@@ -182,7 +182,7 @@ T18 -> T23
 
 ### T10: Switch TLC documentation and invocations
 
-**Status**: Pending
+**Status**: Complete
 **What**: Replace every Python TLC instruction and invocation with `pnpm exec tsx`, document Node/tsx prerequisites, and use Lefthook guidance.
 **Where**: `.agents/skills/tlc-spec-driven/`
 **Depends on**: T02

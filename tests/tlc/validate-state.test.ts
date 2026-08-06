@@ -1,1 +1,40 @@
-import fs from "node:fs";import os from "node:os";import path from "node:path";import{afterEach,describe,expect,it}from"vitest";import{main}from"../../.agents/skills/tlc-spec-driven/scripts/validate_state.ts";const dirs:string[]=[];afterEach(()=>dirs.splice(0).forEach(d=>fs.rmSync(d,{recursive:true,force:true})));function f(report?:string,name="one"){const root=fs.mkdtempSync(path.join(os.tmpdir(),"tlc-state-"));dirs.push(root);const dir=path.join(root,".specs/features",name);fs.mkdirSync(dir,{recursive:true});if(report!==undefined)fs.writeFileSync(path.join(dir,"validation.md"),report);return{root,dir}}describe("validate_state",()=>{it("rejects missing, unfilled, fail, and evidence-free reports",()=>{for(const report of [undefined,"## Validation\n**Result**: [PASS | FAIL]","## Validation\n**Result**: FAIL","## Validation\n**Result**: PASS"]) {const x=f(report);expect(main(["one","--root",x.root])).toBe(1)}});it("accepts a PASS with evidence",()=>{const x=f("## Validation\n**Result**: PASS\n\ntests/a.ts:4");expect(main(["one","--root",x.root])).toBe(0)});it("cross-checks completed multiple features and rejects missing feature",()=>{const x=f("## Validation\nPASS\na.ts:1");const two=path.join(x.root,".specs/features/two");fs.mkdirSync(two,{recursive:true});fs.writeFileSync(path.join(two,"validation.md"),"## Validation\nFAIL");expect(main(["--root",x.root])).toBe(1);expect(main(["none","--root",x.root])).toBe(2)})});
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { main } from "../../.agents/skills/tlc-spec-driven/scripts/validate_state.ts";
+const dirs: string[] = [];
+afterEach(() => dirs.splice(0).forEach((d) => fs.rmSync(d, { recursive: true, force: true })));
+function f(report?: string, name = "one") {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "tlc-state-"));
+  dirs.push(root);
+  const dir = path.join(root, ".specs/features", name);
+  fs.mkdirSync(dir, { recursive: true });
+  if (report !== undefined) fs.writeFileSync(path.join(dir, "validation.md"), report);
+  return { root, dir };
+}
+describe("validate_state", () => {
+  it("rejects missing, unfilled, fail, and evidence-free reports", () => {
+    for (const report of [
+      undefined,
+      "## Validation\n**Result**: [PASS | FAIL]",
+      "## Validation\n**Result**: FAIL",
+      "## Validation\n**Result**: PASS",
+    ]) {
+      const x = f(report);
+      expect(main(["one", "--root", x.root])).toBe(1);
+    }
+  });
+  it("accepts a PASS with evidence", () => {
+    const x = f("## Validation\n**Result**: PASS\n\ntests/a.ts:4");
+    expect(main(["one", "--root", x.root])).toBe(0);
+  });
+  it("cross-checks completed multiple features and rejects missing feature", () => {
+    const x = f("## Validation\nPASS\na.ts:1");
+    const two = path.join(x.root, ".specs/features/two");
+    fs.mkdirSync(two, { recursive: true });
+    fs.writeFileSync(path.join(two, "validation.md"), "## Validation\nFAIL");
+    expect(main(["--root", x.root])).toBe(1);
+    expect(main(["none", "--root", x.root])).toBe(2);
+  });
+});

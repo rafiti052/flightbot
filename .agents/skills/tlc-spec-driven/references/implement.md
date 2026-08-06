@@ -290,16 +290,9 @@ for reuse across multiple endpoints.
 - Never sneak in "while I'm here" changes
 - If tests are part of the task, include them in the same commit
 
-**Deterministic check.** Validate the message before committing: `python3 <skill-dir>/scripts/check_commit.py --message "<your message>"`. A non-zero exit means fix the format first. This makes the format rule enforceable instead of memory-dependent.
+**Deterministic check.** Validate the message before committing: `pnpm exec tsx <skill-dir>/scripts/check_commit.ts --message "<your message>"`.
 
-**Optional git-level guard (git only, no agent dependency).** In a git repo the same check can run on every commit by wiring it as a `commit-msg` hook, so a malformed message is rejected regardless of who or what drives the commit:
-
-```bash
-# from the repo root, one time (resolve <skill-dir> to the directory that contains this skill's SKILL.md):
-ln -sf <skill-dir>/scripts/check_commit.py .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg
-```
-
-This is a plain git hook, not tied to any editor or assistant. Skip it if the project manages hooks its own way (for example a pre-commit framework); the manual check above still applies.
+**Git-level guard.** Configure the repository's Lefthook `commit-msg` command as `pnpm exec tsx <skill-dir>/scripts/check_commit.ts "$1"`; do not install a direct symlink under `.git/hooks/`.
 
 ### 8. Scope Guardrail
 
@@ -403,7 +396,7 @@ If you are unsure whether more tasks remain, check `tasks.md`: if every task is 
 **Status**: ✅ Complete | ❌ Blocked | ⚠️ Partial
 ```
 
-**After the LAST task:** dispatch the Verifier sub-agent (see step 9 and [sub-agents.md](sub-agents.md)) for independent feature-level validation, including the spec-anchored check and discrimination sensor. Validation always runs automatically - never prompted. Execute is not done until the Verifier reports PASS and the validation report is written, confirmed deterministically by `python3 <skill-dir>/scripts/validate_state.py <feature>` (exit non-zero = not done); see [validate.md](validate.md).
+**After the LAST task:** validation is complete only after `pnpm exec tsx <skill-dir>/scripts/validate_state.ts <feature>` passes.
 
 ---
 
@@ -420,7 +413,7 @@ If you are unsure whether more tasks remain, check `tasks.md`: if every task is 
 - **Learn from mistakes** - If something goes wrong, surface it to the user so it informs the next task
 - **Don't stop at the last commit** - Feature-level validation (step 9) is the final step of Execute, not optional
 - **Plain voice in prose** - Commit bodies and the validation summary follow the writing rules in [coding-principles.md](coding-principles.md): lead with what changed, no filler
-- **Validate the commit message** - `python3 <skill-dir>/scripts/check_commit.py --message "..."` before committing
+- **Validate the commit message** - `pnpm exec tsx <skill-dir>/scripts/check_commit.ts --message "..."` before committing
 
 ---
 

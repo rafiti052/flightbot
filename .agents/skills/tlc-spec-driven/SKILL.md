@@ -1,6 +1,6 @@
 ---
 name: tlc-spec-driven
-description: Feature planning and implementation with 4 adaptive phases (Specify, Design, Tasks, Execute). Auto-sizes depth by complexity. Writes testable requirements in EARS notation, atomic tasks, atomic Conventional Commits, and requirement traceability. Ships deterministic Python validation scripts so structural gates are enforced by code, not memory. Features an independent Verifier (author != verifier, evidence-or-zero), a discrimination sensor, a decision log (STATE.md), a test-coverage matrix, and a self-improving lessons layer. Stack-agnostic and tool-agnostic. Use when (1) planning features, (2) implementing with verification and atomic commits, (3) validating an implementation against a spec. Triggers on "specify feature", "discuss feature", "design", "tasks", "implement", "validate", "verify work", "UAT", "record decision", "pause work", "resume work". Do NOT use for pure architecture decomposition analysis or standalone technical design documents.
+description: Feature planning and implementation with 4 adaptive phases (Specify, Design, Tasks, Execute). Auto-sizes depth by complexity. Ships deterministic TypeScript validation scripts so structural gates are enforced by code, not memory.
 license: CC-BY-4.0
 metadata:
   author: Felipe Rodrigues - github.com/felipfr
@@ -24,7 +24,7 @@ Plan and implement features with precision. Granular tasks. Clear dependencies. 
 
 **Loading this skill's files.** Reference files live under `references/` in this skill's own directory (where this `SKILL.md` resides). Resolve them relative to the skill directory - never the workspace root - and load them through the active skill by name; never assume a fixed install path. When a step tells you to read a reference, **read it completely (to EOF)** before acting - never act on a partial/truncated read.
 
-**Running this skill's scripts.** Every `scripts/*.py` shipped with this skill lives under that same skill directory. Resolve the skill directory first, then invoke `python3 <skill-dir>/scripts/<name>.py ...`. Never run `python3 scripts/...` from the consuming project root - that looks for a project-local `scripts/` tree that is not this skill. Project data under `.specs/` is still read/written relative to the project root (pass `--root` when the cwd is elsewhere). Below, `<skill-dir>` means the directory that contains this `SKILL.md`.
+**Running this skill's scripts.** Node.js and `tsx` must be available. Every `scripts/*.ts` shipped with this skill lives under that same skill directory. Resolve the skill directory first, then invoke `pnpm exec tsx <skill-dir>/scripts/<name>.ts ...`. Never run a project-local script by accident. Project data under `.specs/` is still read/written relative to the project root (pass `--root` when the cwd is elsewhere).
 
 **Execution contract - every task, non-negotiable (holds even if you do not open the reference files):**
 
@@ -36,14 +36,14 @@ Plan and implement features with precision. Granular tasks. Clear dependencies. 
 
 **Deterministic gates run before human review - not from memory.** The structural gates for the spec and tasks are enforced by scripts in this skill's `scripts/` directory, so they cannot silently drift when the model forgets a step:
 
-- Before confirming a spec: `python3 <skill-dir>/scripts/validate_spec.py <spec-path-or-feature>` (closure gate: EARS-shaped ACs, filled assumptions, well-formed requirement IDs, required sections).
-- Before presenting tasks for approval: `python3 <skill-dir>/scripts/validate_tasks.py <tasks-path-or-feature>` (granularity smell, diagram-vs-`Depends on` parity within a phase, no forward-phase dependency, every task carries `Tests` + `Gate`).
-- On each commit: `python3 <skill-dir>/scripts/check_commit.py --message "<msg>"` (Conventional Commits). Optionally wire it as a git `commit-msg` guard (git only, no agent dependency) - see [implement.md](references/implement.md).
-- Before declaring a feature done: `python3 <skill-dir>/scripts/validate_state.py <feature>` (completion gate: the Verifier's `validation.md` exists, its verdict is filled to PASS, and it cites `file:line` evidence - a missing, FAIL, placeholder, or evidence-free report fails). The closing step of Execute runs this automatically, the same way the lessons layer runs at distillation; it is not a manual step.
+- Before confirming a spec: `pnpm exec tsx <skill-dir>/scripts/validate_spec.ts <spec-path-or-feature>`.
+- Before presenting tasks: `pnpm exec tsx <skill-dir>/scripts/validate_tasks.ts <tasks-path-or-feature>`.
+- On each commit: `pnpm exec tsx <skill-dir>/scripts/check_commit.ts --message "<msg>"`.
+- Before declaring a feature done: `pnpm exec tsx <skill-dir>/scripts/validate_state.ts <feature>`.
 
 A non-zero exit means STOP and fix before proceeding. Skip a script only when no code-execution tool is available; then perform the same checks by reading the artifact.
 
-**Before Execute:** read [implement.md](references/implement.md) completely and run `<skill-dir>/scripts/validate_tasks.py`; if a formal `tasks.md` packs into more than one task-budgeted batch (> ~8 tasks), present the sub-agent offer first (see Sub-Agent Delegation).
+**Before Execute:** read [implement.md](references/implement.md) completely and run `pnpm exec tsx <skill-dir>/scripts/validate_tasks.ts`; if a formal `tasks.md` packs into more than one task-budgeted batch (> ~8 tasks), present the sub-agent offer first.
 
 ## Auto-Sizing: The Core Principle
 
@@ -71,7 +71,7 @@ A non-zero exit means STOP and fix before proceeding. Skip a script only when no
 ```
 .specs/
 ├── STATE.md            # Project memory: Decisions log (AD-NNN) + Handoff snapshot
-├── LESSONS.md          # Self-improving lessons playbook (rendered by scripts/lessons.py - do not hand-edit)
+├── LESSONS.md          # Self-improving lessons playbook (rendered by scripts/lessons.ts - do not hand-edit)
 ├── lessons.json        # Canonical lessons state (machine-owned)
 └── features/           # Feature specifications
     └── [feature]/
@@ -82,7 +82,7 @@ A non-zero exit means STOP and fix before proceeding. Skip a script only when no
         └── validation.md   # Verifier report: PASS/FAIL, per-AC evidence, sensor result, diff range
 ```
 
-**Create artifacts lazily.** Write each file only when its phase actually produces content - never scaffold empty `context.md`, `design.md`, or `tasks.md` up front. An empty file signals a phase happened when it did not; absence is the correct state for a skipped phase. The deterministic validators (`scripts/validate_spec.py`, `scripts/validate_tasks.py`, `scripts/check_commit.py`, `scripts/validate_state.py`) ship inside this skill's own `scripts/` directory, alongside `lessons.py`.
+**Create artifacts lazily.** The deterministic validators are TypeScript files in this skill's `scripts/` directory, alongside `lessons.ts`.
 
 ## Workflow
 
@@ -101,7 +101,7 @@ A non-zero exit means STOP and fix before proceeding. Skip a script only when no
 **On-demand load (only what the current task needs):**
 
 - `.specs/STATE.md` - Decisions section (read at Design, re-read on resume); Handoff section (read on resume only)
-- confirmed lessons - load at Specify and Design via `python3 <skill-dir>/scripts/lessons.py list --status confirmed` ([lessons.md](references/lessons.md)); confirmed only, never candidates
+- confirmed lessons - load at Specify and Design via `pnpm exec tsx <skill-dir>/scripts/lessons.ts list --status confirmed`
 - spec.md (when working on a specific feature)
 - context.md (when designing or implementing from user decisions)
 - design.md (when implementing from design)
@@ -124,7 +124,7 @@ A non-zero exit means STOP and fix before proceeding. Skip a script only when no
 
 **One worker per task-budgeted batch (~7 tasks, whole phases):** Phases stay the semantic/dependency unit; a **batch** is the execution unit - one or more *consecutive whole phases* packed to ~7 tasks. Walk phases in order, accumulate whole phases into the current batch until it reaches the budget, then start the next - **never split a phase** across workers. ~20 tasks → ~3 workers; scales linearly (40 → ~6). Each worker executes all its tasks in order (implement → gate → atomic commit), then reports a compact summary (tasks done, commit hashes, test counts, deviations). Batches run sequentially - a batch never starts until the previous one reports all tasks complete. Workers never spawn further sub-agents.
 
-**Verifier (always-on, never prompted):** After the final task is committed, the orchestrator dispatches a fresh Verifier sub-agent automatically - regardless of phase count. Validation never requires a user prompt; it is the closing step of Execute. **Author ≠ verifier**: the Verifier re-derives coverage independently using evidence-or-zero; it does not inherit the author's mental model. The Verifier: (1) performs a **spec-anchored outcome check** - confirms each test's asserted value matches the spec-defined expected outcome, flags spec-precision gaps; (2) runs a **discrimination sensor** - injects behavior-level faults in an isolated scratch (temp worktree or file copies - never `git stash`), confirms tests kill them, discards the scratch and verifies real-tree porcelain matches the pre-sensor baseline; surviving mutants become fix tasks; (3) writes `.specs/features/[feature]/validation.md` (PASS/FAIL, per-AC evidence, sensor result, diff range); (4) returns a compact verdict + ranked gap list to the orchestrator in chat. Gaps become fix tasks; the fix→re-verify loop is bounded to 3 iterations before escalating. (5) **distills lessons** - turns each grounded failure (surviving mutant, spec-precision gap, failed AC, SPEC_DEVIATION) into a reusable project-local lesson via `<skill-dir>/scripts/lessons.py`; a clean PASS records nothing (see [lessons.md](references/lessons.md)).
+**Verifier:** after the final task, write validation evidence and distill grounded failures with `pnpm exec tsx <skill-dir>/scripts/lessons.ts`.
 
 **Model tier per role (only if the harness supports choosing a model per sub-agent).** Match the reasoning cost to the work instead of paying top-tier reasoning for boilerplate. A batch worker on a mechanical, low-ambiguity phase (entities, config, wiring, straightforward CRUD) runs on a faster/cheaper tier; a worker on a core-domain or high-ambiguity phase, and the Design phase itself, runs on a high-reasoning tier; the Verifier runs on a mid-to-high tier because it does adversarial reasoning and designs mutations. This is a portable recommendation: if the harness cannot set a per-sub-agent model, ignore it. Full rubric in [sub-agents.md](references/sub-agents.md).
 
