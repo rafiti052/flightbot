@@ -168,13 +168,15 @@ describe("route manager CLI contract", () => {
         ["add", "--from", "A", "--to", "B", "--depart", "2026-09-10", "--name", "A"],
         'A route named "A" already exists. Use a different --name or remove it first.',
       ],
-      [["pause"], 'usage: config-route.js pause "Route Name"'],
+      [["pause"], 'usage: config-route.ts pause "Route Name"'],
+      [["resume"], 'usage: config-route.ts resume "Route Name"'],
+      [["reset"], 'usage: config-route.ts reset "Route Name"'],
       [["resume", "missing"], 'No route named "missing". Available: "A"'],
     ] as const) {
       expect(f.run(argv)).toBe(1);
       expect(f.stderr.at(-1)).toBe(`error: ${message}\n`);
     }
-    expect(f.exits).toEqual(Array(9).fill(1));
+    expect(f.exits).toEqual(Array(11).fill(1));
   });
 
   it("rejects malformed config and prices JSON without mutation", () => {

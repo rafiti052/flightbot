@@ -144,7 +144,7 @@ export function runRouteManager({
       case "pause":
       case "resume": {
         const name = rest[0];
-        if (!name) throw new Error(`usage: config-route.js ${command} "Route Name"`);
+        if (!name) throw new Error(`usage: config-route.ts ${command} "Route Name"`);
         const route = findRoute(name);
         route.active = command === "resume";
         writeJson(configPath, config);
@@ -153,7 +153,7 @@ export function runRouteManager({
       }
       case "reset": {
         const name = rest[0];
-        if (!name) throw new Error('usage: config-route.js reset "Route Name"');
+        if (!name) throw new Error('usage: config-route.ts reset "Route Name"');
         findRoute(name);
         const prices = readJson(pricesPath, {}) as PricesFile;
         if (!(name in prices)) {
